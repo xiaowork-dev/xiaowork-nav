@@ -231,6 +231,9 @@ img {
   font: inherit;
   font-size: 0.88rem;
   font-weight: 600;
+  /* Buttons must never wrap their label into a vertical stack. */
+  white-space: nowrap;
+  flex-shrink: 0;
   cursor: pointer;
   transition: transform var(--transition), background var(--transition), border-color var(--transition), opacity var(--transition);
 }
@@ -336,57 +339,59 @@ img {
 /* ---------- home: clock + search ---------- */
 
 .clock {
-  padding: 22px 0 6px;
+  padding: 14px 0 4px;
   text-align: center;
 }
 
 .clock__time {
-  font-size: clamp(2.3rem, 6vw, 3.6rem);
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: 0.02em;
+  font-size: clamp(1.5rem, 3.2vw, 2.1rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.03em;
   font-variant-numeric: tabular-nums;
+  color: var(--text-sub);
 }
 
 .clock__date {
-  margin-top: 8px;
-  color: var(--text-sub);
-  font-size: 0.9rem;
+  margin-top: 4px;
+  color: var(--text-dim);
+  font-size: 0.82rem;
   font-weight: 600;
 }
 
 .search {
-  width: min(100%, 700px);
-  margin: 16px auto 30px;
+  width: min(100%, 720px);
+  margin: 14px auto 32px;
 }
 
 .search__box {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px;
+  padding: 7px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface-strong);
-  box-shadow: var(--shadow-soft);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 20px 52px rgba(10, 12, 44, 0.26);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 .search__box:focus-within {
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
+  box-shadow: 0 22px 56px rgba(10, 12, 44, 0.32);
 }
 
 .search__engine {
-  min-height: 38px;
-  max-width: 116px;
-  padding: 0 8px;
+  min-height: 40px;
+  max-width: 120px;
+  padding: 0 10px;
   border: 0;
   border-radius: 999px;
   background: var(--surface);
   color: var(--text-main);
   font: inherit;
-  font-size: 0.84rem;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
 }
@@ -400,7 +405,7 @@ img {
   background: transparent;
   color: var(--text-main);
   font: inherit;
-  font-size: 0.98rem;
+  font-size: 1rem;
   outline: none;
 }
 
@@ -524,10 +529,18 @@ img {
 .tile__label {
   width: 100%;
   font-size: 0.75rem;
-  line-height: 1.25;
+  line-height: 1.3;
   text-align: center;
   color: var(--text-main);
-  overflow-wrap: anywhere;
+  /* At most two lines, then an ellipsis; never break mid-word. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  min-height: 2.6em;
 }
 
 .empty {
@@ -616,10 +629,14 @@ img {
   gap: 8px;
 }
 
+/* List rows use grid areas so the mobile layout can move the actions onto
+ * their own line without duplicating markup. */
 .list-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-areas: 'grip main order actions';
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -634,6 +651,7 @@ img {
 }
 
 .list-item__grip {
+  grid-area: grip;
   padding: 0 2px;
   color: var(--text-dim);
   font-size: 1rem;
@@ -641,32 +659,106 @@ img {
   user-select: none;
 }
 
-.list-item__main { flex: 1; min-width: 0; }
+.list-item__main {
+  grid-area: main;
+  min-width: 0;
+}
 
 .list-item__title {
   font-size: 0.92rem;
   font-weight: 700;
-  overflow-wrap: anywhere;
+  /* Never break a name character by character. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  line-height: 1.35;
 }
 
 .list-item__meta {
   font-size: 0.77rem;
   color: var(--text-dim);
-  overflow-wrap: anywhere;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  line-height: 1.4;
 }
 
 .list-item__actions {
+  grid-area: actions;
   display: flex;
   flex-shrink: 0;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
 }
 
 .order-buttons {
+  grid-area: order;
   display: none;
   flex-direction: column;
   gap: 2px;
 }
+
+/* Sorting is only offered inside the explicit sort mode (see BookmarksPage). */
+.list--sortable .order-buttons { display: flex; }
+.list--sortable .list-item { cursor: grab; }
+
+/* ---------- toolbar / pager / banner ---------- */
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.toolbar .input { min-width: 170px; flex: 1 1 170px; }
+.toolbar .select { flex: 0 0 auto; }
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.pager__info { font-size: 0.82rem; color: var(--text-dim); }
+.pager__controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+.banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  font-size: 0.84rem;
+}
+
+/* ---------- search engine editor ---------- */
+
+.engine-row {
+  display: grid;
+  grid-template-columns: minmax(0, 150px) minmax(0, 1fr) auto;
+  grid-template-areas: 'name tpl del';
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+}
+
+.engine-row__name { grid-area: name; min-width: 0; }
+.engine-row__tpl { grid-area: tpl; min-width: 0; }
+.engine-row__del { grid-area: del; }
+
 
 /* ---------- modal ---------- */
 
@@ -798,23 +890,72 @@ img {
 
   .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .tile { width: 100%; }
-  .tile__label { font-size: 0.72rem; }
 
-  .clock { padding-top: 14px; }
-  .clock__time { font-size: 2.3rem; }
-  .clock__date { font-size: 0.82rem; }
+  .clock { padding-top: 10px; }
+  .clock__time { font-size: 1.5rem; }
+  .clock__date { font-size: 0.78rem; }
 
-  .search { margin-bottom: 22px; }
+  .search { margin: 10px auto 20px; }
   .search__box { padding: 5px; }
   .search__engine { max-width: 92px; font-size: 0.8rem; }
   .search__input { font-size: 0.9rem; }
 
-  .category { margin-bottom: 24px; }
-  .category__title { font-size: 0.96rem; }
+  .category { margin-bottom: 22px; }
+  .category__title { font-size: 0.94rem; }
 
-  .list-item { flex-wrap: wrap; }
-  .order-buttons { display: flex; }
+  /* Admin rows: name/count on top, actions on their own line. */
+  .list-item {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'main main'
+      'order actions';
+    gap: 8px 10px;
+    padding: 12px;
+    align-items: start;
+  }
+
+  .list-item__title,
+  .list-item__meta {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* HTML5 drag is unavailable on touch; use the ↑↓ buttons instead. */
   .list-item__grip { display: none; }
+
+  .order-buttons {
+    display: flex;
+    flex-direction: row;
+    align-self: center;
+  }
+
+  .order-buttons .btn {
+    min-width: 40px;
+    min-height: 38px;
+    padding: 0 10px;
+  }
+
+  .list-item__actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .list-item__actions .btn {
+    min-height: 38px;
+    padding: 0 12px;
+  }
+
+  /* Search-engine editor: stack fields so the delete button keeps its width. */
+  .engine-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'name del'
+      'tpl tpl';
+  }
+  .engine-row__name { grid-area: name; }
+  .engine-row__tpl { grid-area: tpl; }
+  .engine-row__del { grid-area: del; }
 
   .modal-backdrop { align-items: flex-end; padding: 10px; }
   .modal { max-height: calc(100vh - 20px); border-radius: 18px; }
@@ -823,5 +964,5 @@ img {
 
 @media (max-width: 380px) {
   .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .clock__time { font-size: 2rem; }
+  .clock__time { font-size: 1.35rem; }
 }

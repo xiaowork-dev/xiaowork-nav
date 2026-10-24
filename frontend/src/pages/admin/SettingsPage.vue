@@ -152,11 +152,18 @@ onMounted(load)
 
       <div class="field">
         <label>搜索引擎</label>
-        <div class="list">
-          <div v-for="(engine, index) in form.search_engines" :key="index" class="list-item">
-            <input v-model="engine.name" class="input" style="max-width: 150px" placeholder="名称" />
-            <input v-model="engine.url_template" class="input" placeholder="https://…/search?q={query}" />
-            <button type="button" class="btn btn--sm btn--danger" @click="removeEngine(index)">删除</button>
+        <div class="stack">
+          <div v-for="(engine, index) in form.search_engines" :key="index" class="engine-row">
+            <input v-model="engine.name" class="input engine-row__name" placeholder="名称" aria-label="搜索引擎名称" />
+            <input
+              v-model="engine.url_template"
+              class="input engine-row__tpl"
+              placeholder="https://…/search?q={query}"
+              aria-label="搜索引擎地址模板"
+            />
+            <button type="button" class="btn btn--sm btn--danger engine-row__del" @click="removeEngine(index)">
+              删除
+            </button>
           </div>
         </div>
         <button type="button" class="btn btn--sm" style="margin-top: 8px" @click="addEngine">添加搜索引擎</button>
