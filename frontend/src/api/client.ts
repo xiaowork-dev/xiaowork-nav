@@ -34,6 +34,8 @@ export interface RequestOptions {
   body?: unknown
   query?: Record<string, string | number | boolean | undefined>
   signal?: AbortSignal
+  /** Send the body as-is (e.g. FormData) without JSON encoding. */
+  raw?: boolean
 }
 
 function buildUrl(path: string, query?: RequestOptions['query']): string {
@@ -49,10 +51,18 @@ function buildUrl(path: string, query?: RequestOptions['query']): string {
 
 /** Perform a request and return the parsed JSON body. */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, query, signal } = options
+  const { method = 'GET', body, query, signal, raw = false } = options
 
   const headers: Record<string, string> = { Accept: 'application/json' }
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  let payload: BodyInit | undefined
+  if (body !== undefined) {
+    if (raw) {
+      payload = body as BodyInit
+    } else {
+      headers['Content-Type'] = 'application/json'
+      payload = JSON.stringify(body)
+    }
+  }
   // CSRF signal expected by the backend on state-changing requests.
   if (method !== 'GET') headers['X-Requested-With'] = 'XMLHttpRequest'
 
@@ -60,7 +70,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     method,
     headers,
     credentials: 'include',
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: payload,
     signal,
   })
 

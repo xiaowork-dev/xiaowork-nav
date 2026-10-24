@@ -50,14 +50,14 @@ Reverse proxy (NPM / Nginx / Caddy)
 xiaowork-nav/
 ├── frontend/                    # 可独立启动、可被整体替换
 │   ├── src/
-│   │   ├── api/                 # 唯一 HTTP 出口（API 客户端）
-│   │   ├── pages/               # 路由页面
-│   │   ├── components/          # 通用组件
-│   │   ├── composables/         # 组合式逻辑
-│   │   ├── stores/              # 状态管理
-│   │   ├── router/
+│   │   ├── api/                 # 唯一 HTTP 出口（client + 按资源拆分）
+│   │   ├── pages/               # 路由页面（含 admin/ 后台）
+│   │   ├── components/          # 通用组件与表单弹窗
+│   │   ├── composables/         # useDragSort / useTheme / useToast
+│   │   ├── stores/              # 状态管理（auth / site）
+│   │   ├── router/              # 路由与鉴权守卫
 │   │   ├── types/               # 与 OpenAPI 对齐的类型
-│   │   └── styles/
+│   │   └── styles/              # 主题与样式
 │   ├── index.html
 │   ├── vite.config.ts
 │   ├── package.json

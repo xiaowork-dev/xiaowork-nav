@@ -77,18 +77,22 @@ server: {
 ```text
 frontend/src/
 ├── api/            # 唯一 HTTP 出口
-│   ├── client.ts   # fetch 封装：baseURL、credentials、错误归一化
-│   ├── auth.ts
-│   ├── public.ts
-│   └── admin.ts
-├── types/          # 与 OpenAPI 对齐（openapi-typescript 生成）
-├── stores/         # Pinia
-├── router/         # 路由与鉴权守卫
-├── pages/          # 路由页面
-├── components/     # 通用组件
-├── composables/
-└── styles/
+│   ├── client.ts   # fetch 封装：baseURL、credentials、CSRF 头、错误归一化、文件上传
+│   ├── auth.ts     # 初始化/登录/登出/改密
+│   ├── public.ts   # 公开导航、设置、搜索
+│   ├── categories.ts / bookmarks.ts  # 管理端分类与站点
+│   ├── admin.ts    # 设置、图标、导入导出、备份、更新检查
+│   └── system.ts   # 健康检查与版本
+├── types/api.ts    # 与 OpenAPI 对齐（可由 openapi-typescript 生成后替换）
+├── stores/         # Pinia：auth（会话）、site（公开设置与导航树）
+├── router/         # 路由与鉴权守卫（未初始化→/setup；管理路由未登录→/login?redirect=）
+├── pages/          # 路由页面（含 admin/ 后台：分类、网站、设置、数据）
+├── components/     # 通用组件（页头、搜索、磁贴、弹窗、表单、提示）
+├── composables/    # useDragSort / useTheme / useToast
+└── styles/         # CSS 变量主题与组件样式
 ```
+
+当前已实现的功能（P3）：导航首页与搜索、初始化向导、登录/退出、分类管理（含拖拽排序）、网站管理（含图标上传/抓取）、系统设置、数据导入导出与备份、浅色/深色主题、响应式布局。
 
 ---
 

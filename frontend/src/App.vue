@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// Root component: only hosts the router view. Layout lives in pages.
+import ToastHost from '@/components/ToastHost.vue'
 </script>
 
 <template>
   <router-view />
+  <ToastHost />
 </template>

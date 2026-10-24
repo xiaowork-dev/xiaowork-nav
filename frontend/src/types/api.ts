@@ -1,9 +1,9 @@
 /**
  * API types mirroring `docs/openapi/openapi.yaml`.
  *
- * These are hand-maintained for now. Once the contract is frozen they can be
- * regenerated with `npm run gen:types` (openapi-typescript) into
- * `src/types/openapi.d.ts`; this file then becomes a thin re-export.
+ * Hand-maintained. Once the contract is frozen these can be regenerated with
+ * `npm run gen:types` (openapi-typescript); this file then becomes a thin
+ * re-export.
  */
 
 export type Theme = 'light' | 'dark' | 'auto'
@@ -48,6 +48,13 @@ export interface Category {
   bookmarks?: Bookmark[]
 }
 
+export interface CategoryInput {
+  name: string
+  description?: string
+  sort_order?: number
+  is_visible?: boolean
+}
+
 export interface Bookmark {
   id: number
   category_id: number
@@ -62,6 +69,19 @@ export interface Bookmark {
   open_in_new_tab: boolean
   created_at?: string
   updated_at?: string
+}
+
+export interface BookmarkInput {
+  category_id: number
+  title: string
+  url: string
+  description?: string
+  icon_type?: IconType
+  icon_value?: string
+  keywords?: string
+  sort_order?: number
+  is_visible?: boolean
+  open_in_new_tab?: boolean
 }
 
 export interface SearchEngine {
@@ -80,6 +100,10 @@ export interface PublicSettings {
   homepage_layout: HomepageLayout
 }
 
+export interface AdminSettings extends PublicSettings {
+  allow_guest_access: boolean
+}
+
 export interface NavigationResponse {
   categories: Category[]
   settings: PublicSettings
@@ -95,11 +119,66 @@ export interface Paginated<T> extends ListMeta {
   items: T[]
 }
 
-export interface OrderRequest {
-  items: Array<{ id: number; sort_order: number }>
+export interface OrderItem {
+  id: number
+  sort_order: number
 }
 
 export interface OrderResult {
   ok: boolean
   updated?: number
+}
+
+export interface UploadResult {
+  filename: string
+  url: string
+  size: number
+  mime: string
+}
+
+export interface IconRef {
+  icon_type: IconType
+  icon_value: string
+}
+
+export interface Backup {
+  id: string
+  created_at: string
+  app_version?: string
+  schema_version?: number
+  size?: number
+}
+
+export interface ImportPreview {
+  format: string
+  categories_new: number
+  categories_conflict: number
+  bookmarks_new: number
+  bookmarks_conflict: number
+  warnings?: string[]
+}
+
+export interface ImportResult {
+  ok: boolean
+  categories_imported: number
+  bookmarks_imported: number
+  skipped: number
+}
+
+export interface UpdateInfo {
+  current_version: string
+  latest_version: string
+  update_available: boolean
+  release_url?: string
+  checked_at?: string
+}
+
+export interface ExportBundle {
+  format: string
+  schema_version: number
+  exported_at?: string
+  checksum?: string
+  categories?: Category[]
+  bookmarks?: Bookmark[]
+  settings?: Record<string, unknown>
 }

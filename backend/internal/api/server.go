@@ -63,55 +63,9 @@ func New(deps Deps) *Server {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
-	// System
-	mux.HandleFunc("GET /healthz", s.handleHealth)
-	mux.HandleFunc("GET /api/v1/version", s.handleVersion)
-
-	// Auth
-	mux.HandleFunc("GET /api/v1/auth/status", s.optionalAuth(s.handleAuthStatus))
-	mux.HandleFunc("POST /api/v1/setup", s.handleSetup)
-	mux.HandleFunc("POST /api/v1/auth/login", s.handleLogin)
-	mux.HandleFunc("POST /api/v1/auth/logout", s.requireAuth(s.handleLogout))
-	mux.HandleFunc("GET /api/v1/auth/me", s.requireAuth(s.handleMe))
-	mux.HandleFunc("PUT /api/v1/auth/password", s.requireAuth(s.handleChangePassword))
-
-	// Public
-	mux.HandleFunc("GET /api/v1/public/navigation", s.publicRead(s.handlePublicNavigation))
-	mux.HandleFunc("GET /api/v1/public/categories", s.publicRead(s.handlePublicCategories))
-	mux.HandleFunc("GET /api/v1/public/categories/{id}/bookmarks", s.publicRead(s.handlePublicCategoryBookmarks))
-	mux.HandleFunc("GET /api/v1/public/search", s.publicRead(s.handlePublicSearch))
-	mux.HandleFunc("GET /api/v1/public/settings", s.publicRead(s.handlePublicSettings))
-	mux.HandleFunc("GET /api/v1/public/uploads/{filename}", s.handlePublicUpload)
-
-	// Admin: categories
-	mux.HandleFunc("GET /api/v1/admin/categories", s.requireAuth(s.handleListCategories))
-	mux.HandleFunc("POST /api/v1/admin/categories", s.requireAuth(s.handleCreateCategory))
-	mux.HandleFunc("PUT /api/v1/admin/categories/order", s.requireAuth(s.handleReorderCategories))
-	mux.HandleFunc("GET /api/v1/admin/categories/{id}", s.requireAuth(s.handleGetCategory))
-	mux.HandleFunc("PATCH /api/v1/admin/categories/{id}", s.requireAuth(s.handleUpdateCategory))
-	mux.HandleFunc("DELETE /api/v1/admin/categories/{id}", s.requireAuth(s.handleDeleteCategory))
-
-	// Admin: bookmarks
-	mux.HandleFunc("GET /api/v1/admin/bookmarks", s.requireAuth(s.handleListBookmarks))
-	mux.HandleFunc("POST /api/v1/admin/bookmarks", s.requireAuth(s.handleCreateBookmark))
-	mux.HandleFunc("PUT /api/v1/admin/bookmarks/order", s.requireAuth(s.handleReorderBookmarks))
-	mux.HandleFunc("GET /api/v1/admin/bookmarks/{id}", s.requireAuth(s.handleGetBookmark))
-	mux.HandleFunc("PATCH /api/v1/admin/bookmarks/{id}", s.requireAuth(s.handleUpdateBookmark))
-	mux.HandleFunc("DELETE /api/v1/admin/bookmarks/{id}", s.requireAuth(s.handleDeleteBookmark))
-	mux.HandleFunc("POST /api/v1/admin/bookmarks/{id}/move", s.requireAuth(s.handleMoveBookmark))
-
-	// Admin: settings, icons, transfer, backups
-	mux.HandleFunc("GET /api/v1/admin/settings", s.requireAuth(s.handleGetSettings))
-	mux.HandleFunc("PUT /api/v1/admin/settings", s.requireAuth(s.handleUpdateSettings))
-	mux.HandleFunc("POST /api/v1/admin/uploads/icon", s.requireAuth(s.handleUploadIcon))
-	mux.HandleFunc("POST /api/v1/admin/icons/fetch", s.requireAuth(s.handleFetchIcon))
-	mux.HandleFunc("GET /api/v1/admin/export", s.requireAuth(s.handleExport))
-	mux.HandleFunc("POST /api/v1/admin/import/preview", s.requireAuth(s.handleImportPreview))
-	mux.HandleFunc("POST /api/v1/admin/import", s.requireAuth(s.handleImport))
-	mux.HandleFunc("GET /api/v1/admin/backups", s.requireAuth(s.handleListBackups))
-	mux.HandleFunc("POST /api/v1/admin/backups", s.requireAuth(s.handleCreateBackup))
-	mux.HandleFunc("POST /api/v1/admin/backups/{id}/restore", s.requireAuth(s.handleRestoreBackup))
-	mux.HandleFunc("GET /api/v1/admin/update-check", s.requireAuth(s.handleUpdateCheck))
+	for _, rt := range s.routes() {
+		mux.HandleFunc(rt.Method+" "+rt.Pattern, rt.Handler)
+	}
 
 	// Unmatched API routes return a JSON 404 rather than the SPA shell.
 	mux.HandleFunc("/api/", notFound)
