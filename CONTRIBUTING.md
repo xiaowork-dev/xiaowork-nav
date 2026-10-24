@@ -6,7 +6,7 @@
 
 1. **后端优先、API 驱动**：接口变更先改 [`docs/openapi/openapi.yaml`](docs/openapi/openapi.yaml)，再改实现与前端。
 2. **严格前后端分离**：前端只通过 `/api/v1` 与后端交互；不得直接访问数据库或依赖后端内部结构。
-3. **每阶段交付文档**：完成一个可验收步骤后，更新 `docs/PROGRESS.md` 并在 `docs/deliveries/` 新增交付记录。
+3. **每阶段交付文档**：完成一个阶段后，必须生成 `docs/deliveries/P<N>-delivery.md` 阶段交付报告，并更新 `docs/PROGRESS.md`。规范详见 [`AGENTS.md`](AGENTS.md)。
 4. **重要决策写 ADR**：见 `docs/decisions/`。
 
 ## 本地开发

@@ -37,5 +37,7 @@
 
 | 文档 | 内容 |
 | --- | --- |
+| [../AGENTS.md](../AGENTS.md) | **项目级 Agent 指令与阶段交付规范（必读）** |
 | [PROGRESS.md](PROGRESS.md) | 项目进度总览 |
-| [deliveries/](deliveries/) | 各阶段交付记录 |
+| [deliveries/P1-delivery.md](deliveries/P1-delivery.md) | **P1 阶段交付报告（正式归档）** |
+| [deliveries/](deliveries/) | 过程记录与后续阶段交付报告 |

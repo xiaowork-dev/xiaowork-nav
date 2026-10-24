@@ -1,8 +1,10 @@
 # 项目进度总览
 
-> 最后更新：2026-10-24 17:02（Asia/Shanghai）
+> 最后更新：2026-10-24 17:15（Asia/Shanghai）
 > 项目：XiaoWork Nav V2.0
 > 总体状态：开发中（P1 完成：需求/契约/数据库设计 + 项目初始化 + 后端基础架构 + 前端骨架）
+>
+> 交付规范见 [`../AGENTS.md`](../AGENTS.md)：每阶段必须产出 `docs/deliveries/P<N>-delivery.md`。
 
 ## 项目目标与当前阶段
 
@@ -52,8 +54,9 @@
 
 ## 最近交付记录
 
-- [2026-10-24 P1 项目初始化与后端基础架构](deliveries/20261024-170200-p1-init-backend-skeleton.md)
-- [2026-10-24 架构与开发计划调整](deliveries/20261024-163148-v2-planning-adjustment.md)
+- **[P1 阶段交付报告](deliveries/P1-delivery.md)**（正式归档）
+- [2026-10-24 P1 项目初始化与后端基础架构](deliveries/20261024-170200-p1-init-backend-skeleton.md)（过程记录）
+- [2026-10-24 架构与开发计划调整](deliveries/20261024-163148-v2-planning-adjustment.md)（过程记录）
 
 ## 验证与环境说明
 
