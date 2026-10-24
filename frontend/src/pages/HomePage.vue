@@ -97,7 +97,10 @@ onUnmounted(() => {
       @submit="openEngine"
     />
 
-    <div v-if="site.loading" class="empty">正在加载导航数据…</div>
+    <div v-if="site.loading" class="empty">
+      <span class="spinner" style="margin: 0 auto 10px" />
+      正在加载导航数据…
+    </div>
 
     <div v-else-if="site.error" class="empty">
       <p>无法加载导航数据：{{ site.error }}</p>

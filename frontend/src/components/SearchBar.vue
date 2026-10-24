@@ -46,7 +46,7 @@ function onSubmit(): void {
         class="search__input"
         type="search"
         :value="modelValue"
-        placeholder="输入关键词：实时筛选站点，回车用所选引擎搜索"
+        placeholder="搜索站点，或回车用所选引擎搜索"
         aria-label="搜索"
         @input="onInput"
       />

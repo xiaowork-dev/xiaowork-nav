@@ -58,4 +58,5 @@
 | [deliveries/P1-delivery.md](deliveries/P1-delivery.md) | **P1 阶段交付报告（正式归档）** |
 | [deliveries/P2-delivery.md](deliveries/P2-delivery.md) | **P2 阶段交付报告（正式归档）** |
 | [deliveries/P3-delivery.md](deliveries/P3-delivery.md) | **P3 阶段交付报告（正式归档）** |
+| [deliveries/P4-delivery.md](deliveries/P4-delivery.md) | **P4 阶段交付报告（正式归档）** |
 | [deliveries/](deliveries/) | 过程记录与后续阶段交付报告 |
