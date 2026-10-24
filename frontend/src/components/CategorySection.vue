@@ -8,7 +8,10 @@ defineProps<{ category: Category; defaultNewTab: boolean }>()
 <template>
   <section class="category">
     <div class="category__head">
-      <h2 class="category__title">{{ category.name }}</h2>
+      <span v-if="category.icon" class="category__icon">{{ category.icon }}</span>
+      <h2 class="category__title" :style="category.color ? { color: category.color } : undefined">
+        {{ category.name }}
+      </h2>
       <span class="badge">{{ category.bookmarks?.length ?? 0 }}</span>
       <span v-if="category.description" class="dim" style="font-size: 0.82rem">{{ category.description }}</span>
     </div>

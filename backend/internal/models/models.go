@@ -41,6 +41,8 @@ type Category struct {
 	ID            int64      `json:"id"`
 	Name          string     `json:"name"`
 	Description   string     `json:"description"`
+	Icon          string     `json:"icon"`
+	Color         string     `json:"color"`
 	SortOrder     int        `json:"sort_order"`
 	IsVisible     bool       `json:"is_visible"`
 	BookmarkCount int        `json:"bookmark_count,omitempty"`
@@ -50,6 +52,8 @@ type Category struct {
 }
 
 // Bookmark is a navigation entry.
+//
+// IconType values: none | url | upload | auto | favicon | simple | text.
 type Bookmark struct {
 	ID           int64  `json:"id"`
 	CategoryID   int64  `json:"category_id"`
@@ -59,6 +63,8 @@ type Bookmark struct {
 	IconType     string `json:"icon_type"`
 	IconValue    string `json:"icon_value"`
 	Keywords     string `json:"keywords"`
+	Tags         string `json:"tags"`
+	Color        string `json:"color"`
 	SortOrder    int    `json:"sort_order"`
 	IsVisible    bool   `json:"is_visible"`
 	OpenInNewTab bool   `json:"open_in_new_tab"`
@@ -143,6 +149,9 @@ type ImportPreview struct {
 	BookmarksInvalid   int      `json:"bookmarks_invalid"`
 	IconsKept          int      `json:"icons_kept"`
 	IconsConverted     int      `json:"icons_converted"`
+	IconsSimple        int      `json:"icons_simple"`
+	IconsText          int      `json:"icons_text"`
+	IconsFavicon       int      `json:"icons_favicon"`
 	IconsDropped       int      `json:"icons_dropped"`
 	Warnings           []string `json:"warnings,omitempty"`
 }

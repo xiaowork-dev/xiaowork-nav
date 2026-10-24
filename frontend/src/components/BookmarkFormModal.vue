@@ -25,6 +25,8 @@ const form = reactive({
   category_id: props.bookmark?.category_id ?? props.defaultCategoryId ?? props.categories[0]?.id ?? 0,
   description: props.bookmark?.description ?? '',
   keywords: props.bookmark?.keywords ?? '',
+  tags: props.bookmark?.tags ?? '',
+  color: props.bookmark?.color ?? '',
   icon_type: (props.bookmark?.icon_type ?? 'none') as IconType,
   icon_value: props.bookmark?.icon_value ?? '',
   sort_order: props.bookmark?.sort_order ?? 0,
@@ -34,16 +36,44 @@ const form = reactive({
 
 const hasCategories = computed(() => props.categories.length > 0)
 
-// Keep icon_type consistent when the address is typed manually: a non-empty
-// value implies a URL icon, an empty value means no icon.
+const iconValueHint = computed(() => {
+  switch (form.icon_type) {
+    case 'url':
+      return '图片地址（https://…）'
+    case 'upload':
+      return '上传后自动填写'
+    case 'simple':
+      return 'Simple Icons 标识（如 github、vercel）'
+    case 'text':
+      return '文字图标（最多 4 个字符，如 延迟）'
+    default:
+      return ''
+  }
+})
+
+const iconValueEditable = computed(() =>
+  ['url', 'upload', 'simple', 'text'].includes(form.icon_type),
+)
+
+// Types that carry no value; keep the field consistent with the backend.
+watch(
+  () => form.icon_type,
+  (type) => {
+    if (type === 'none' || type === 'auto' || type === 'favicon') {
+      form.icon_value = ''
+    }
+  },
+)
+
+// Typing an address while "no icon" is selected implies an external URL.
 watch(
   () => form.icon_value,
   (value) => {
     const trimmed = value.trim()
-    if (!trimmed) {
-      form.icon_type = 'none'
-    } else if (form.icon_type === 'none') {
+    if (form.icon_type === 'none' && trimmed) {
       form.icon_type = 'url'
+    } else if (form.icon_type === 'url' && !trimmed) {
+      form.icon_type = 'none'
     }
   },
 )
@@ -104,6 +134,18 @@ async function submit(): Promise<void> {
     error.value = '请选择所属分类'
     return
   }
+  if (form.icon_type === 'url' && !form.icon_value.trim()) {
+    error.value = '请填写图标地址，或改用其他图标类型'
+    return
+  }
+  if (form.icon_type === 'simple' && !form.icon_value.trim()) {
+    error.value = '请填写 Simple Icons 标识'
+    return
+  }
+  if (form.icon_type === 'text' && !form.icon_value.trim()) {
+    error.value = '请填写文字图标内容'
+    return
+  }
   busy.value = true
   error.value = null
   try {
@@ -113,6 +155,8 @@ async function submit(): Promise<void> {
       url: form.url.trim(),
       description: form.description,
       keywords: form.keywords,
+      tags: form.tags,
+      color: form.color,
       icon_type: form.icon_type,
       icon_value: form.icon_value,
       sort_order: form.sort_order,
@@ -138,8 +182,7 @@ async function submit(): Promise<void> {
 
 <template>
   <ModalDialog :title="props.bookmark ? '编辑站点' : '新建站点'" @close="emit('close')">
-    <form @submit.prevent="submit">
-      <div class="field">
+    <form @submit.prevent="submit">      <div class="field">
         <label for="bm-title">名称</label>
         <input id="bm-title" v-model="form.title" class="input" maxlength="128" required />
       </div>
@@ -160,6 +203,18 @@ async function submit(): Promise<void> {
       </div>
 
       <div class="field">
+        <label for="bm-icon-type">图标类型</label>
+        <select id="bm-icon-type" v-model="form.icon_type" class="select">
+          <option value="none">无图标（自动尝试站点 Favicon，再退回首字母）</option>
+          <option value="url">图片地址</option>
+          <option value="upload">本地上传</option>
+          <option value="simple">Simple Icons 标识</option>
+          <option value="text">文字图标</option>
+          <option value="favicon">站点 Favicon</option>
+        </select>
+      </div>
+
+      <div class="field">
         <label>图标</label>
         <div class="row" style="flex-wrap: wrap">
           <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/x-icon,image/svg+xml" hidden @change="uploadIcon" />
@@ -167,8 +222,18 @@ async function submit(): Promise<void> {
           <button type="button" class="btn btn--sm" :disabled="busy" @click="fetchIcon">抓取站点图标</button>
           <button type="button" class="btn btn--sm btn--ghost" :disabled="busy" @click="clearIcon">清除</button>
         </div>
-        <input v-model="form.icon_value" class="input" style="margin-top: 8px" placeholder="图标地址（可手动填写）" />
-        <span class="hint">当前类型：{{ form.icon_type }}</span>
+        <input
+          v-if="iconValueEditable"
+          v-model="form.icon_value"
+          class="input"
+          style="margin-top: 8px"
+          :placeholder="iconValueHint"
+          maxlength="2048"
+        />
+        <span class="hint">
+          当前类型：{{ form.icon_type }}
+          <template v-if="form.icon_type === 'simple'">（仅接受已验证的 Simple Icons 标识）</template>
+        </span>
       </div>
 
       <div class="field">
@@ -179,6 +244,25 @@ async function submit(): Promise<void> {
       <div class="field">
         <label for="bm-keywords">关键词（可选，逗号分隔）</label>
         <input id="bm-keywords" v-model="form.keywords" class="input" maxlength="512" />
+      </div>
+
+      <div class="field">
+        <label for="bm-tags">标签（可选，逗号分隔）</label>
+        <input id="bm-tags" v-model="form.tags" class="input" maxlength="256" placeholder="例如 Info,Art" />
+      </div>
+
+      <div class="field">
+        <label for="bm-color">强调色（可选）</label>
+        <div class="row">
+          <input id="bm-color" v-model="form.color" class="input" placeholder="#RRGGBB" />
+          <input
+            :value="form.color || '#6d5dfc'"
+            type="color"
+            style="width: 46px; height: 40px; padding: 2px; border-radius: 10px"
+            aria-label="选择颜色"
+            @input="form.color = ($event.target as HTMLInputElement).value"
+          />
+        </div>
       </div>
 
       <div class="field">

@@ -913,6 +913,12 @@ components:
         id: { type: integer }
         name: { type: string }
         description: { type: string }
+        icon:
+          type: string
+          description: 分类图标（emoji 或极短文字，最多 8 个字符）
+        color:
+          type: string
+          description: 可选强调色（`#RGB` 或 `#RRGGBB`）
         sort_order: { type: integer }
         is_visible: { type: boolean, description: 'false = 私有，仅管理员可见' }
         bookmark_count: { type: integer }
@@ -925,6 +931,8 @@ components:
       properties:
         name: { type: string, minLength: 1, maxLength: 64 }
         description: { type: string, maxLength: 512 }
+        icon: { type: string, maxLength: 8 }
+        color: { type: string, pattern: '^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$' }
         sort_order: { type: integer }
         is_visible: { type: boolean }
       required: [name]
@@ -934,6 +942,8 @@ components:
       properties:
         name: { type: string, minLength: 1, maxLength: 64 }
         description: { type: string, maxLength: 512 }
+        icon: { type: string, maxLength: 8 }
+        color: { type: string, pattern: '^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$' }
         sort_order: { type: integer }
         is_visible: { type: boolean }
 
@@ -1141,6 +1151,15 @@ components:
         icons_converted:
           type: integer
           description: 由内嵌 data URI 转换为本地上传的图标数量（icon_type=upload）
+        icons_simple:
+          type: integer
+          description: 映射到已验证 Simple Icons 的图标数量（icon_type=simple）
+        icons_text:
+          type: integer
+          description: 文字型图标数量（icon_type=text）
+        icons_favicon:
+          type: integer
+          description: 使用站点 Favicon 回退的图标数量（icon_type=favicon）
         icons_dropped:
           type: integer
           description: 图标值无效、已设为无图标的数量

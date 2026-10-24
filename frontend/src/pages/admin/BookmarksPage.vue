@@ -186,7 +186,11 @@ onMounted(refresh)
             {{ bookmark.title }}
             <span v-if="!bookmark.is_visible" class="badge badge--private">私有</span>
           </div>
-          <div class="list-item__meta">{{ bookmark.url }}</div>
+          <div class="list-item__meta">
+            {{ bookmark.url }}
+            <template v-if="bookmark.tags"> · 标签：{{ bookmark.tags }}</template>
+            · 图标：{{ bookmark.icon_type }}
+          </div>
         </div>
 
         <div v-if="canReorder" class="order-buttons">

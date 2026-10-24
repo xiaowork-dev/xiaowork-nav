@@ -465,6 +465,22 @@ a {
   color: var(--accent);
 }
 
+/* Text glyph icons (legacy 「延迟」/「地址」/「ip」). */
+.tile__text {
+  max-width: 84%;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+.category__icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
 .tile__label {
   width: 100%;
   text-align: center;

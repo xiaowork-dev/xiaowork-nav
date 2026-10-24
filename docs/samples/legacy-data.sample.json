@@ -6,8 +6,14 @@
       {
         "name": "Example Site",
         "url": "https://example.com/",
-        "desc": "示例站点（无图标）",
-        "si": "example"
+        "desc": "示例站点（无图标，si 不是有效 slug）",
+        "si": "not-a-real-icon-slug"
+      },
+      {
+        "name": "Simple Icon Site",
+        "url": "https://simple.example.com/",
+        "desc": "si 命中 Simple Icons",
+        "si": "github"
       },
       {
         "name": "Embedded SVG Icon",
@@ -32,13 +38,13 @@
       {
         "name": "Text Glyph Icon",
         "url": "https://text-icon.example.com/",
-        "desc": "文本型图标",
+        "desc": "文字型图标",
         "logo": "延迟"
       },
       {
         "name": "Favicon Type",
         "url": "https://favicon.example.com/",
-        "desc": "iconType=favicon（不自动替换）",
+        "desc": "iconType=favicon（显示时回退）",
         "iconType": "favicon",
         "color": "#2D72D9",
         "tag": "Info"

@@ -173,9 +173,10 @@ onMounted(loadBackups)
         分类：新增 {{ preview.categories_new }} / 冲突 {{ preview.categories_conflict }}；
         站点：新增 {{ preview.bookmarks_new }} / 冲突 {{ preview.bookmarks_conflict }}
       </p>
-      <p v-if="preview.icons_kept || preview.icons_converted || preview.icons_dropped" class="muted" style="font-size: 0.86rem">
-        图标：原样保留 {{ preview.icons_kept ?? 0 }} · 转为本地 {{ preview.icons_converted ?? 0 }} · 无效丢弃
-        {{ preview.icons_dropped ?? 0 }}
+      <p class="muted" style="font-size: 0.86rem">
+        图标：外部保留 {{ preview.icons_kept ?? 0 }} · 转为本地 {{ preview.icons_converted ?? 0 }} · Simple Icons
+        {{ preview.icons_simple ?? 0 }} · 文字 {{ preview.icons_text ?? 0 }} · Favicon 回退
+        {{ preview.icons_favicon ?? 0 }} · 无效 {{ preview.icons_dropped ?? 0 }}
       </p>
       <p v-if="preview.bookmarks_invalid" class="muted" style="font-size: 0.86rem">
         网址不合法的条目：{{ preview.bookmarks_invalid }}（导入时会跳过）

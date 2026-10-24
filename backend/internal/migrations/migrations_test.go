@@ -60,8 +60,7 @@ func TestApplyIsIdempotent(t *testing.T) {
 	}
 }
 
-func TestExpectedTablesExist(t *testing.T) {
-	db, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
+func TestExpectedTablesExist(t *testing.T) {	db, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatalf("store.Open() error = %v", err)
 	}
@@ -108,5 +107,60 @@ func TestForeignKeysCascade(t *testing.T) {
 	}
 	if count != 0 {
 		t.Errorf("expected cascade delete, got %d bookmarks", count)
+	}
+}
+
+// TestExtendedColumnsExist verifies the 0002 migration added the icon/label
+// columns to existing tables without recreating them.
+func TestExtendedColumnsExist(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("store.Open() error = %v", err)
+	}
+	defer db.Close()
+	if _, err := Apply(db); err != nil {
+		t.Fatalf("Apply() error = %v", err)
+	}
+
+	want := map[string][]string{
+		"categories": {"icon", "color"},
+		"bookmarks":  {"tags", "color"},
+	}
+	for table, columns := range want {
+		rows, err := db.Query(`SELECT name FROM pragma_table_info(?)`, table)
+		if err != nil {
+			t.Fatalf("pragma_table_info(%s): %v", table, err)
+		}
+		have := map[string]bool{}
+		for rows.Next() {
+			var name string
+			if err := rows.Scan(&name); err != nil {
+				rows.Close()
+				t.Fatalf("scan column: %v", err)
+			}
+			have[name] = true
+		}
+		rows.Close()
+		for _, column := range columns {
+			if !have[column] {
+				t.Errorf("table %s is missing column %q", table, column)
+			}
+		}
+	}
+
+	// The migration must be recorded and not re-applied.
+	applied, err := Apply(db)
+	if err != nil {
+		t.Fatalf("second Apply() error = %v", err)
+	}
+	if len(applied) != 0 {
+		t.Errorf("migrations re-applied: %v", applied)
+	}
+	latest, err := LatestVersion()
+	if err != nil {
+		t.Fatalf("LatestVersion() error = %v", err)
+	}
+	if latest < 2 {
+		t.Errorf("latest migration version = %d, want >= 2", latest)
 	}
 }

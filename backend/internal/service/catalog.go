@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/xiaowork-dev/xiaowork-nav/backend/internal/models"
@@ -18,12 +19,32 @@ const (
 	maxTitleLen        = 128
 	maxDescriptionLen  = 512
 	maxKeywordsLen     = 512
+	maxTagsLen         = 256
 	maxIconValueLen    = 2048
+	maxIconTextRunes   = 8
+	maxCategoryIconLen = 8
 	maxPageSize        = 100
 	defaultPageSize    = 20
 )
 
-var allowedIconTypes = map[string]bool{"none": true, "url": true, "upload": true, "auto": true}
+// Icon types accepted by the API.
+//
+//   - none    : no icon; the frontend falls back to the site favicon then a letter
+//   - url     : external image URL (user supplied)
+//   - upload  : icon stored locally under /api/v1/public/uploads
+//   - auto    : reserved for server-side fetching
+//   - favicon : derive `<origin>/favicon.ico` at display time
+//   - simple  : verified Simple Icons slug rendered from the CDN
+//   - text    : short text glyph (e.g. 「延迟」) rendered as a label
+var allowedIconTypes = map[string]bool{
+	"none":    true,
+	"url":     true,
+	"upload":  true,
+	"auto":    true,
+	"favicon": true,
+	"simple":  true,
+	"text":    true,
+}
 
 // CatalogService implements category and bookmark business rules.
 type CatalogService struct {
@@ -40,6 +61,8 @@ func NewCatalogService(st *store.Store, settings *SettingsService) *CatalogServi
 type CategoryInput struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Icon        string `json:"icon"`
+	Color       string `json:"color"`
 	SortOrder   *int   `json:"sort_order"`
 	IsVisible   *bool  `json:"is_visible"`
 }
@@ -53,6 +76,8 @@ type BookmarkInput struct {
 	IconType     string `json:"icon_type"`
 	IconValue    string `json:"icon_value"`
 	Keywords     string `json:"keywords"`
+	Tags         string `json:"tags"`
+	Color        string `json:"color"`
 	SortOrder    *int   `json:"sort_order"`
 	IsVisible    *bool  `json:"is_visible"`
 	OpenInNewTab *bool  `json:"open_in_new_tab"`
@@ -92,9 +117,19 @@ func (c *CatalogService) CreateCategory(ctx context.Context, in CategoryInput) (
 	if err != nil {
 		return nil, err
 	}
+	icon, err := validateCategoryIcon(in.Icon)
+	if err != nil {
+		return nil, err
+	}
+	color, err := validateColor(in.Color)
+	if err != nil {
+		return nil, err
+	}
 	cat := &models.Category{
 		Name:        name,
 		Description: description,
+		Icon:        icon,
+		Color:       color,
 		SortOrder:   derefInt(in.SortOrder, 0),
 		IsVisible:   derefBool(in.IsVisible, true),
 	}
@@ -156,6 +191,26 @@ func applyCategoryPatch(cat *models.Category, patch map[string]json.RawMessage) 
 				return err
 			}
 			cat.Description = desc
+		case "icon":
+			var v string
+			if err := json.Unmarshal(raw, &v); err != nil {
+				return fieldErr("icon", "格式错误")
+			}
+			icon, err := validateCategoryIcon(v)
+			if err != nil {
+				return err
+			}
+			cat.Icon = icon
+		case "color":
+			var v string
+			if err := json.Unmarshal(raw, &v); err != nil {
+				return fieldErr("color", "格式错误")
+			}
+			color, err := validateColor(v)
+			if err != nil {
+				return err
+			}
+			cat.Color = color
 		case "sort_order":
 			var v int
 			if err := json.Unmarshal(raw, &v); err != nil {
@@ -236,6 +291,14 @@ func (c *CatalogService) CreateBookmark(ctx context.Context, in BookmarkInput) (
 	if err != nil {
 		return nil, err
 	}
+	tags, err := validateOptionalText(in.Tags, maxTagsLen, "tags")
+	if err != nil {
+		return nil, err
+	}
+	color, err := validateColor(in.Color)
+	if err != nil {
+		return nil, err
+	}
 
 	b := &models.Bookmark{
 		CategoryID:   *in.CategoryID,
@@ -245,6 +308,8 @@ func (c *CatalogService) CreateBookmark(ctx context.Context, in BookmarkInput) (
 		IconType:     iconType,
 		IconValue:    iconValue,
 		Keywords:     keywords,
+		Tags:         tags,
+		Color:        color,
 		SortOrder:    derefInt(in.SortOrder, 0),
 		IsVisible:    derefBool(in.IsVisible, true),
 		OpenInNewTab: derefBool(in.OpenInNewTab, true),
@@ -353,6 +418,26 @@ func applyBookmarkPatch(b *models.Bookmark, patch map[string]json.RawMessage) er
 				return err
 			}
 			b.Keywords = text
+		case "tags":
+			var v string
+			if err := json.Unmarshal(raw, &v); err != nil {
+				return fieldErr("tags", "格式错误")
+			}
+			text, err := validateOptionalText(v, maxTagsLen, "tags")
+			if err != nil {
+				return err
+			}
+			b.Tags = text
+		case "color":
+			var v string
+			if err := json.Unmarshal(raw, &v); err != nil {
+				return fieldErr("color", "格式错误")
+			}
+			color, err := validateColor(v)
+			if err != nil {
+				return err
+			}
+			b.Color = color
 		case "icon_type", "icon_value":
 			// Applied together after the loop to keep them consistent.
 			continue
@@ -496,21 +581,65 @@ func validateIcon(iconType, iconValue string) (string, string, error) {
 		iconType = "none"
 	}
 	if !allowedIconTypes[iconType] {
-		return "", "", fieldErr("icon_type", "仅允许 none/url/upload/auto")
+		return "", "", fieldErr("icon_type", "仅允许 none/url/upload/auto/favicon/simple/text")
 	}
 	iconValue = strings.TrimSpace(iconValue)
 	if len(iconValue) > maxIconValueLen {
 		return "", "", fieldErr("icon_value", fmt.Sprintf("最多 %d 个字符", maxIconValueLen))
 	}
-	if iconType == "url" && iconValue != "" {
+
+	switch iconType {
+	case "none", "auto", "favicon":
+		// These types carry no stored value.
+		iconValue = ""
+	case "url":
+		if iconValue == "" {
+			return "", "", fieldErr("icon_value", "图标 URL 不能为空")
+		}
 		if err := security.ValidateHTTPURL(iconValue); err != nil {
-			return "", "", fieldErr("icon_value", "图标 URL 非法")
+			return "", "", fieldErr("icon_value", "图标 URL 非法（仅允许 http/https）")
+		}
+	case "upload":
+		if iconValue == "" || !strings.HasPrefix(iconValue, "/") {
+			return "", "", fieldErr("icon_value", "上传图标必须是站内路径")
+		}
+	case "simple":
+		if !IsSimpleIconSlug(iconValue) {
+			return "", "", fieldErr("icon_value", "不是可用的 Simple Icons 图标标识")
+		}
+		iconValue = strings.ToLower(iconValue)
+	case "text":
+		if iconValue == "" {
+			return "", "", fieldErr("icon_value", "文字图标不能为空")
+		}
+		if len([]rune(iconValue)) > maxIconTextRunes {
+			return "", "", fieldErr("icon_value", fmt.Sprintf("文字图标最多 %d 个字符", maxIconTextRunes))
 		}
 	}
-	if iconType == "none" {
-		iconValue = ""
-	}
 	return iconType, iconValue, nil
+}
+
+// validateCategoryIcon accepts an emoji or a very short text glyph.
+func validateCategoryIcon(value string) (string, error) {
+	v := strings.TrimSpace(value)
+	if len([]rune(v)) > maxCategoryIconLen {
+		return "", fieldErr("icon", fmt.Sprintf("最多 %d 个字符", maxCategoryIconLen))
+	}
+	return v, nil
+}
+
+var hexColorPattern = regexp.MustCompile(`^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$`)
+
+// validateColor accepts an empty value or a #RGB / #RRGGBB hex colour.
+func validateColor(value string) (string, error) {
+	v := strings.TrimSpace(value)
+	if v == "" {
+		return "", nil
+	}
+	if !hexColorPattern.MatchString(v) {
+		return "", fieldErr("color", "颜色需为 #RGB 或 #RRGGBB")
+	}
+	return v, nil
 }
 
 func fieldErr(field, issue string) *Error {

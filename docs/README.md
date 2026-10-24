@@ -24,6 +24,15 @@
 | --- | --- |
 | [samples/legacy-data.sample.json](samples/legacy-data.sample.json) | 脱敏的旧站数据样本（供自动化测试；真实数据不入库） |
 
+## 视觉审查材料
+
+> 以下快照包含真实站点数据，**不纳入版本库**（`.gitignore` 已排除 `docs/screenshots/`），仅保留在本机。
+
+| 文件（本地，未入库） | 内容 |
+| --- | --- |
+| `docs/screenshots/home-page-snapshot.html` | 导航首页的离线 DOM 快照（真实渲染结果，非截图） |
+| `docs/screenshots/admin-bookmarks-snapshot.html` | 后台网站管理列表的离线 DOM 快照 |
+
 ## 契约
 
 | 文件 | 内容 |

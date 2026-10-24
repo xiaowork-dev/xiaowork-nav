@@ -140,6 +140,8 @@
 | `iconType=favicon` | `icon_type=none` | **不自动抓取/替换**，避免擅自改变图标 | ⚠️ 1 项（见 8.3） |
 | `desc` 为空 | 空字符串 | | ✅ |
 
+> ⚠️ **本节部分规则已被第 13 节（P3 收尾增强）取代**：文字型图标现在映射为 `icon_type=text`（不再降级为无图标），`si` 命中已验证的 Simple Icons 标识时映射为 `icon_type=simple`，`tag` 迁移到独立的 `tags` 字段，`color` 迁移到独立的 `color` 字段，分类 `icon`（emoji）迁移到 `categories.icon`。以第 13 节为准。
+
 ---
 
 ## 4. `legacy-v1` 兼容性检查与代码改进
@@ -496,3 +498,188 @@ curl -sS -b cookies.txt -H 'Content-Type: application/json' \
 4. **`komari探针` 图标**：是否替换为图片直链（当前地址是网页而非图片）？
 5. **重复的 `cloudflare`**：`Daily` 与 `域名` 各一条，是否保持两条？
 6. **`color`（6 项）与分类 emoji（10 项）**：是否需要新增对应字段以完整保留？
+
+---
+
+## 13. P3 收尾补充：迁移质量增强（2026-10-24）
+
+> 本节是 P3 阶段收尾的补充记录，不替代 P3 阶段报告。
+> 目标：恢复旧版图标显示能力、扩展数据模型、加固迁移安全，并用真实数据重新验证。
+
+### 13.1 本次新增工作
+
+#### A. 图标显示链（前端）
+
+`IconImage` 组件实现分级回退，**所有自动步骤都只是显示回退，绝不改写已存储的图标地址**：
+
+1. 用户设置的图标：`url` / `upload` / `auto` / `simple`（CDN）/ `text`（文字）
+2. 站点自身的 Favicon：`<origin>/favicon.ico`
+3. 标题首字母占位
+
+| 类型 | 含义 | 是否用户显式设置 |
+| --- | --- | --- |
+| `url` | 用户提供的外部图片地址 | ✅ |
+| `upload` | 本地上传（含迁移的 31 个内嵌 SVG） | ✅ |
+| `simple` | 已验证的 Simple Icons 标识 | ✅ |
+| `text` | 文字图标（如「延迟」） | ✅ |
+| `favicon` | 显示时取站点 Favicon | ✅ |
+| `none` | 无图标 → 显示时依次尝试 Favicon、首字母 | — |
+
+#### B. Simple Icons 语义独立化
+
+- 内置**官方 slug 白名单**（3,494 个，来源 Simple Icons `slugs.md`，2026-10-24 抓取），
+  存于 `backend/internal/service/data/simpleicons.txt`，通过 `go:embed` 打包。
+- 只有**命中白名单**的 `si` 值才映射为 `icon_type=simple`；其余（如 `微软`、`yongge`、`speed`）
+  **不会**被拼成 CDN URL，而是保留到关键词并计入告警。
+- 实测：旧站 8 个非空 `si` 中 4 个有效（`github`、`vercel`、`stackoverflow`、`artstation`），
+  4 个无效（`speed`、`yongge`、`88完美邮箱`、`微软`）。CDN 探测结果与白名单一致。
+
+#### C. 数据模型扩展（版本化迁移 `0002_icons_and_labels`）
+
+| 表 | 新增列 | 用途 |
+| --- | --- | --- |
+| `categories` | `icon` | 分类 emoji / 极短文字 |
+| `categories` | `color` | 可选强调色 |
+| `bookmarks` | `color` | 可选强调色 |
+| `bookmarks` | `tags` | 标签（旧站 `tag`） |
+
+- 使用 `ALTER TABLE ... ADD COLUMN ... DEFAULT ''`，**非破坏性**，不重建数据库。
+- 同步更新：后端模型、`store` 读写、OpenAPI 契约（含 `icon_type` 枚举扩展）、前端类型与表单、测试。
+- 迁移器支持多版本；重复启动不会重复执行。
+
+#### D. 安全加固
+
+| 项 | 措施 | 验证 |
+| --- | --- | --- |
+| SVG 不被当作 HTML 执行 | 以 `image/svg+xml` + `X-Content-Type-Options: nosniff` + `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` 提供；前端仅用 `<img>` 引用，不做内联注入 | `TestSVGUploadIsServedAsImageWithSandbox` |
+| 伪装成 SVG 的 HTML | 内容嗅探改为要求 **同时** 满足 `.svg` 扩展名与 `<svg` 根元素 | `TestUploadRejectsHTMLMasqueradingAsSVG` |
+| 上传限制 | ≤1 MiB、类型白名单、文件名白名单、无路径穿越 | `TestUploadRejectsUnsupportedAndOversizedFiles`、`TestPublicUploadRejectsPathTraversal` |
+| 公开读取需授权边界 | 上传目录只通过受控路由提供；未知文件 404 | `TestPublicUploadRejectsPathTraversal` |
+| 导入失败可回滚 | 单事务写入；书签引用未知分类时跳过而非猜测 | `TestImportRollsBackAndRemovesUploadsOnFailure` |
+| 导入失败不留孤儿文件 | 转换出的图标文件与上传元数据在事务失败时一并清理 | `TestImportRollsBackAndRemovesUploadsOnFailure` |
+| 备份同时覆盖数据库与图标 | 快照 = 数据库副本 + `<id>.files/` 图标目录；恢复时一起还原 | `TestBackupAndRestoreIncludesUploads` |
+
+### 13.2 真实数据重新导入结果（独立测试库）
+
+在**全新空库**中重新导入真实 `data.json`（未触碰任何生产环境）：
+
+| 核对项 | 结果 |
+| --- | --- |
+| 分类数量 | ✅ 10 / 10 |
+| 网站数量 | ✅ 110 / 110 |
+| 分类顺序 | ✅ 与源文件逐项一致（`Daily → SpeedTest → 常用 → IP&DNS → AI & 智能 → VPS/云服务器 → 邮箱 → 开发 & 编程 → 域名 → 其他导航`） |
+| 分类内网站顺序 | ✅ `sort_order` 10,20,30… 与源顺序一致 |
+| 手动图标地址（19 个） | ✅ **19/19 逐字符未变**（0 个被改动） |
+| 内嵌 SVG（31 个） | ✅ **31/31 字节级无损**（解码后与存储文件逐字节相同） |
+| 无效网址 | 0（与首次一致） |
+| 导入结果 | 分类 10 / 网站 110 / 跳过 0 |
+
+**图标类型分布（改进后）**
+
+| 类型 | 数量 | 说明 |
+| --- | --- | --- |
+| `upload` | 31 | 内嵌 SVG 转本地（内容无损） |
+| `url` | 19 | 外部地址原样保留 |
+| `simple` | 4 | `si` 命中白名单 |
+| `text` | 3 | 文字型图标 |
+| `favicon` | 1 | 旧站标记 favicon |
+| `none` | 52 | 无图标 → 前台尝试站点 Favicon |
+
+（改进前：`none` 60 / `upload` 31 / `url` 19。）
+
+### 13.3 图标显示效果（浏览器实测，Chromium + 真实后端）
+
+| 指标 | 改进前 | 改进后 |
+| --- | --- | --- |
+| 显示图片的网站 | 49 | **85** |
+| 显示文字图标 | 0 | **3** |
+| 首字母占位 | 61 | **22** |
+| 有图标的网站合计 | 49 | **88** |
+
+改进后的图片构成：本地 SVG 31 · 站点 Favicon 32 · 外部地址 18 · Simple Icons 4。
+
+**回退链实际生效示例**：`komari探针` 的原图标地址是图床网页（返回 `text/html`，无法作为图片），
+系统按设计回退到其站点 Favicon 并成功显示，**原地址未被改写**。
+
+**仍有 22 个网站显示首字母**（其站点自身未提供可访问的 Favicon），清单见 13.5。
+
+### 13.4 视觉审查材料
+
+⚠️ **未能提供真实浏览器截图**：本环境的浏览器工具要求桌面窗口可见，无法截屏（多次尝试均返回
+`Screenshot needs a visible tab`）。作为替代，提供了两份**离线 DOM 快照**（真实页面渲染结果的静态副本，
+非截图）。
+
+> ⚠️ 这两份快照**包含真实站点名称与地址**，因此**不纳入 Git 版本库**（已在 `.gitignore` 中排除
+> `docs/screenshots/`）。它们保留在本机，供你直接双击打开审查。
+
+| 文件（本地，未入库） | 内容 | 说明 |
+| --- | --- | --- |
+| `docs/screenshots/home-page-snapshot.html` | 导航首页（10 分类 / 110 磁贴） | 已内联样式与 31 个本地 SVG（base64），可直接双击打开 |
+| `docs/screenshots/admin-bookmarks-snapshot.html` | 后台「网站管理」列表（110 行，含图标类型与标签） | 同上 |
+
+> 快照为真实页面 DOM 的静态副本，已移除脚本；远程图标（Favicon / 外部地址）需要联网才能显示。
+
+### 13.5 仍需人工处理的网站
+
+**A. 显示首字母占位的 22 个网站**（站点自身无可用 Favicon）
+
+| 分类 | 网站 |
+| --- | --- |
+| Daily | NodeSeek、烧饼论坛、节点一键脚本 |
+| SpeedTest | Fast、LibreSpeed、Measurementlab、IP+测速 |
+| IP&DNS | Scamalytics、DNSCheck |
+| AI & 智能 | 通义千问 |
+| VPS/云服务器 | vmiss、Vmrack、bitsflow、nosla、ReckNerd、Zouter、虫网 |
+| 邮箱 | 88完美邮箱、临时邮箱、nodeseek邮箱、微软邮箱管理 |
+| 其他导航 | 科技lion导航站 |
+
+> 处理方式：在后台「网站管理」中为这些站点设置图标（上传 / 图片地址 / Simple Icons 标识 / 文字图标）。
+> 其中「开发 & 编程」的 GitHub/Vercel/Stack Overflow 已通过 Simple Icons 显示，无需处理。
+
+**B. 之前提出的 6 项确认，本次已处理 4 项**
+
+| # | 事项 | 状态 |
+| --- | --- | --- |
+| 1 | 文本图标 3 项 | ✅ 已保留为 `icon_type=text` |
+| 2 | `si` 8 项 | ✅ 4 项有效→Simple Icons；4 项无效→保留在关键词（不再猜测 CDN） |
+| 3 | `iconType=favicon` 的 IPinfo | ✅ 已设为 `icon_type=favicon`（显示时取站点 Favicon，不抓取、不覆盖） |
+| 4 | `komari探针` 图标是网页而非图片 | 🟡 原地址保留；已自动回退到站点 Favicon 正常显示。如需精确还原，请提供图片直链 |
+| 5 | 重复的 `cloudflare`（Daily + 域名） | 🟡 仍保留两条（未擅自去重），如需合并请告知 |
+| 6 | `color` 6 项与分类 emoji 10 项 | ✅ 已新增字段并完整迁移 |
+
+**C. 其他**
+
+- `莱卡云` 图标服务器响应较慢（自动检查曾 8 秒超时），浏览器中可正常显示，建议关注。
+
+### 13.6 测试与构建结果
+
+| 检查 | 命令 | 结果 |
+| --- | --- | --- |
+| 后端构建 | `go build ./...` | ✅ 通过 |
+| 后端静态检查 | `go vet ./...` | ✅ 通过 |
+| 后端测试 | `go test -count=1 ./...` | ✅ **70 通过 / 0 失败**（上次 58） |
+| 前端类型检查 + 构建 | `npm run build` | ✅ 通过 |
+| 契约一致性 | `TestRoutesMatchOpenAPIContract` | ✅ 通过 |
+| 迁移新增列 | `TestExtendedColumnsExist` | ✅ 通过 |
+| 真实数据核对 | `verify.js`（计数/顺序/图标/字节比对） | ✅ 全部通过 |
+
+### 13.7 Git 状态
+
+| 项 | 内容 |
+| --- | --- |
+| 分支 | `master` |
+| 上次提交 | `e6d3d44` — `feat(import): support the real legacy data format and verify migration` |
+| 本次提交 | 见聊天总结（本文件随该提交一起入库） |
+| 工作区 | 干净 |
+| 远程 / 推送 | 未配置 / 未推送 |
+
+### 13.8 本次未验证事项
+
+| 未验证项 | 原因 |
+| --- | --- |
+| 真实浏览器截图 | 浏览器工具要求桌面窗口可见，本环境不可用（已用离线 DOM 快照替代） |
+| 移动端与跨浏览器图标显示 | 环境仅有 Chromium，无设备模拟 |
+| 正式/生产环境导入 | 按要求未操作生产环境 |
+| 22 个占位网站的人工图标补录 | 需人工决策 |
+| Docker 镜像构建与容器内运行 | Docker 守护进程不可用 |
+

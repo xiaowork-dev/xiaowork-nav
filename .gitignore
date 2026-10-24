@@ -47,3 +47,6 @@ desktop.ini
 data.json
 legacy-data.json
 *.private.json
+
+# Visual review artifacts rendered from real data (local only).
+docs/screenshots/

@@ -209,6 +209,15 @@ func (i *IconService) Open(ctx context.Context, filename string) (io.ReadSeekClo
 	return f, upload.Mime, nil
 }
 
+// DeleteUpload removes an uploaded icon from disk and its metadata.
+func (i *IconService) DeleteUpload(ctx context.Context, filename string) error {
+	if !safeFilenamePattern.MatchString(filename) || strings.Contains(filename, "..") {
+		return fmt.Errorf("unsafe upload filename %q", filename)
+	}
+	_ = os.Remove(filepath.Join(i.uploadsDir, filename))
+	return i.store.DeleteUpload(ctx, filename)
+}
+
 // SaveDataURI decodes a `data:` URI image (percent-encoded or base64) and
 // stores it as an uploaded icon. This preserves legacy icons that were embedded
 // directly in the source data instead of being hosted at a URL.
@@ -290,11 +299,12 @@ func detectImageType(data []byte, name string) (mime, ext string, ok bool) {
 	if e, found := allowedImageTypes[sniffed]; found {
 		return sniffed, e, true
 	}
-	// SVG is not detected by content sniffing; accept it by extension plus a
-	// leading '<' marker (an XML document).
+	// SVG is not detected by content sniffing. Require an .svg name AND an
+	// actual <svg ...> root element, so an HTML document cannot masquerade as
+	// an icon.
 	if strings.EqualFold(filepath.Ext(name), ".svg") {
-		trimmed := strings.TrimSpace(string(data[:min(len(data), 512)]))
-		if strings.HasPrefix(trimmed, "<") {
+		head := strings.ToLower(string(data[:min(len(data), 1024)]))
+		if strings.Contains(head, "<svg") {
 			return "image/svg+xml", ".svg", true
 		}
 	}

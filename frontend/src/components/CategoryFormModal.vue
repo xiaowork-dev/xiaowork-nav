@@ -15,6 +15,8 @@ const error = ref<string | null>(null)
 const form = reactive({
   name: props.category?.name ?? '',
   description: props.category?.description ?? '',
+  icon: props.category?.icon ?? '',
+  color: props.category?.color ?? '',
   sort_order: props.category?.sort_order ?? 0,
   is_visible: props.category?.is_visible ?? true,
 })
@@ -54,6 +56,23 @@ async function submit(): Promise<void> {
       <div class="field">
         <label for="cat-desc">描述（可选）</label>
         <input id="cat-desc" v-model="form.description" class="input" maxlength="512" />
+      </div>
+      <div class="field">
+        <label for="cat-icon">图标（可选，emoji 或极短文字）</label>
+        <input id="cat-icon" v-model="form.icon" class="input" maxlength="8" placeholder="例如 ✨ 或 常用" />
+      </div>
+      <div class="field">
+        <label for="cat-color">强调色（可选）</label>
+        <div class="row">
+          <input id="cat-color" v-model="form.color" class="input" placeholder="#RRGGBB" />
+          <input
+            :value="form.color || '#6d5dfc'"
+            type="color"
+            style="width: 46px; height: 40px; padding: 2px; border-radius: 10px"
+            aria-label="选择颜色"
+            @input="form.color = ($event.target as HTMLInputElement).value"
+          />
+        </div>
       </div>
       <div class="field">
         <label for="cat-order">排序值（越小越靠前）</label>

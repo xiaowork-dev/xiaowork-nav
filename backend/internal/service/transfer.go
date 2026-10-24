@@ -19,6 +19,7 @@ const (
 	FormatNative = "xiaowork-nav-v1"
 	FormatLegacy = "legacy-v1"
 
+	// Format version of the export bundle itself (not the database schema).
 	currentSchemaVersion = 1
 )
 
@@ -106,10 +107,9 @@ func DecodeBundle(raw []byte) (*models.ExportBundle, []string, error) {
 	}
 
 	var probe struct {
-		Format     string              `json:"format"`
-		Categories []json.RawMessage   `json:"categories"`
-		Bookmarks  []json.RawMessage   `json:"bookmarks"`
-		Items      []json.RawMessage   `json:"items"`
+		Format     string            `json:"format"`
+		Categories []json.RawMessage `json:"categories"`
+		Bookmarks  []json.RawMessage `json:"bookmarks"`
 	}
 	if err := json.Unmarshal(trimmed, &probe); err != nil {
 		return nil, nil, Validation("validation_failed", "导入数据不是合法 JSON")
@@ -121,7 +121,6 @@ func DecodeBundle(raw []byte) (*models.ExportBundle, []string, error) {
 	case FormatLegacy:
 		return normalizeLegacy(trimmed)
 	case "":
-		// Detect by shape: native categories carry `name`/`bookmarks`/`sort_order`.
 		if len(probe.Bookmarks) > 0 || looksNative(probe.Categories) {
 			return decodeNative(trimmed)
 		}
@@ -150,14 +149,10 @@ func looksNative(categories []json.RawMessage) bool {
 		if err := json.Unmarshal(raw, &probe); err != nil {
 			continue
 		}
-		if _, ok := probe["name"]; ok {
-			return true
-		}
-		if _, ok := probe["bookmarks"]; ok {
-			return true
-		}
-		if _, ok := probe["sort_order"]; ok {
-			return true
+		for _, key := range []string{"name", "bookmarks", "sort_order"} {
+			if _, ok := probe[key]; ok {
+				return true
+			}
 		}
 	}
 	return false
@@ -174,6 +169,7 @@ type legacyCategory struct {
 	Name      string       `json:"name"`
 	Title     string       `json:"title"`
 	Icon      string       `json:"icon"`
+	Color     string       `json:"color"`
 	Items     []legacyItem `json:"items"`
 	Links     []legacyItem `json:"links"`
 	Bookmarks []legacyItem `json:"bookmarks"`
@@ -196,27 +192,29 @@ type legacyItem struct {
 	IconType    string `json:"iconType"`
 	SI          string `json:"si"`
 	Tag         string `json:"tag"`
-	Keywords    string `json:"keywords"`
 	Tags        string `json:"tags"`
+	Keywords    string `json:"keywords"`
 	Color       string `json:"color"`
 }
 
 type legacyStats struct {
-	categories           int
-	items                int
-	siMapped             int
-	tagMapped            int
-	colorUnmapped        int
-	categoryIconUnmapped int
-	textIcons            int
-	dataURIs             int
-	externalIcons        int
-	missingName          int
-	missingURL           int
+	categories       int
+	items            int
+	siAsIcon         int
+	siUnmatched      int
+	tagsMapped       int
+	colorsMapped     int
+	colorsUnmapped   int
+	categoryIcons    int
+	textIcons        int
+	faviconIcons     int
+	dataURIs         int
+	externalIcons    int
+	missingName      int
+	missingURL       int
 }
 
 func normalizeLegacy(raw []byte) (*models.ExportBundle, []string, error) {
-	// Accept both a top-level array and an object wrapper.
 	var categories []legacyCategory
 	if trimmed := bytes.TrimSpace(raw); len(trimmed) > 0 && trimmed[0] == '[' {
 		if err := json.Unmarshal(trimmed, &categories); err != nil {
@@ -224,7 +222,7 @@ func normalizeLegacy(raw []byte) (*models.ExportBundle, []string, error) {
 		}
 	} else {
 		var doc legacyDocument
-		if err := json.Unmarshal(trimmed, &doc); err != nil {
+		if err := json.Unmarshal(bytes.TrimSpace(raw), &doc); err != nil {
 			return nil, nil, Validation("validation_failed", "无法解析旧站数据："+err.Error())
 		}
 		categories = doc.Categories
@@ -240,13 +238,17 @@ func normalizeLegacy(raw []byte) (*models.ExportBundle, []string, error) {
 			continue
 		}
 		stats.categories++
-		if strings.TrimSpace(lc.Icon) != "" {
-			stats.categoryIconUnmapped++
+
+		categoryIcon := strings.TrimSpace(lc.Icon)
+		if categoryIcon != "" {
+			stats.categoryIcons++
 		}
 
 		cat := models.Category{
 			ID:        nextID,
 			Name:      name,
+			Icon:      categoryIcon,
+			Color:     normalizeLegacyColor(lc.Color, stats),
 			SortOrder: int(nextID) * 10,
 			IsVisible: true,
 		}
@@ -279,7 +281,11 @@ func normalizeLegacy(raw []byte) (*models.ExportBundle, []string, error) {
 			}
 
 			position++
-			iconType, iconValue := mapLegacyIcon(item, stats)
+			iconType, iconValue, siUsedAsIcon := mapLegacyIcon(item, stats)
+			tags := buildLegacyTags(item)
+			if tags != "" {
+				stats.tagsMapped++
+			}
 
 			bookmark := models.Bookmark{
 				CategoryID:   cat.ID,
@@ -288,19 +294,12 @@ func normalizeLegacy(raw []byte) (*models.ExportBundle, []string, error) {
 				Description:  strings.TrimSpace(firstNonEmpty(item.Description, item.Desc)),
 				IconType:     iconType,
 				IconValue:    iconValue,
-				Keywords:     buildLegacyKeywords(item),
+				Keywords:     buildLegacyKeywords(item, siUsedAsIcon),
+				Tags:         tags,
+				Color:        normalizeLegacyColor(item.Color, stats),
 				SortOrder:    position * 10,
 				IsVisible:    true,
 				OpenInNewTab: true,
-			}
-			if strings.TrimSpace(item.SI) != "" {
-				stats.siMapped++
-			}
-			if strings.TrimSpace(item.Tag) != "" {
-				stats.tagMapped++
-			}
-			if strings.TrimSpace(item.Color) != "" {
-				stats.colorUnmapped++
 			}
 			bundle.Bookmarks = append(bundle.Bookmarks, bookmark)
 		}
@@ -316,43 +315,81 @@ func normalizeLegacy(raw []byte) (*models.ExportBundle, []string, error) {
 
 // mapLegacyIcon converts a legacy icon field into our icon model.
 //
-// Rules (see docs/legacy-data-migration-report.md):
-//   - http(s) URL          -> icon_type=url, value kept verbatim (never replaced)
-//   - data: URI image      -> kept verbatim here; converted to an uploaded file
-//     by sanitizeIcons so the exact icon is preserved without inflating payloads
-//   - short text (e.g. 延迟) -> no image; the text is preserved in keywords
-//   - iconType=favicon     -> treated as "no icon" (we do not substitute a favicon)
-func mapLegacyIcon(item legacyItem, stats *legacyStats) (string, string) {
+// Priority (a user-supplied icon always wins):
+//  1. `logo` http(s) URL      -> icon_type=url, value kept verbatim
+//  2. `logo` data: URI        -> kept verbatim; converted to an upload later
+//  3. `logo` short text       -> icon_type=text (e.g. 「延迟」)
+//  4. `si` verified slug      -> icon_type=simple (Simple Icons CDN)
+//  5. `iconType=favicon`      -> icon_type=favicon (display-time fallback)
+//  6. otherwise               -> icon_type=none (frontend tries favicon, then letter)
+func mapLegacyIcon(item legacyItem, stats *legacyStats) (string, string, bool) {
 	value := strings.TrimSpace(firstNonEmpty(item.Logo, item.Icon, item.IconURL, item.Favicon))
-	if value == "" {
-		return "none", ""
+	if value != "" {
+		if IsDataURI(value) {
+			stats.dataURIs++
+			return "url", value, false
+		}
+		if security.ValidateHTTPURL(value) == nil {
+			stats.externalIcons++
+			return "url", value, false
+		}
+		// A short text glyph used as an icon.
+		stats.textIcons++
+		return "text", value, false
 	}
-	if IsDataURI(value) {
-		stats.dataURIs++
-		return "url", value // sanitizeIcons converts this into an upload
+
+	si := strings.TrimSpace(item.SI)
+	if si != "" {
+		if IsSimpleIconSlug(si) {
+			stats.siAsIcon++
+			return "simple", strings.ToLower(si), true
+		}
+		stats.siUnmatched++
 	}
-	if security.ValidateHTTPURL(value) == nil {
-		stats.externalIcons++
-		return "url", value
+
+	if strings.EqualFold(strings.TrimSpace(item.IconType), "favicon") {
+		stats.faviconIcons++
+		return "favicon", "", false
 	}
-	// Not an image reference (e.g. a short text glyph).
-	stats.textIcons++
-	return "none", ""
+	return "none", "", false
 }
 
-func buildLegacyKeywords(item legacyItem) string {
+func buildLegacyKeywords(item legacyItem, siUsedAsIcon bool) string {
 	parts := []string{}
-	for _, v := range []string{item.Keywords, item.Tags, item.SI, item.Tag} {
+	for _, v := range []string{item.Keywords} {
 		if trimmed := strings.TrimSpace(v); trimmed != "" {
 			parts = append(parts, trimmed)
 		}
 	}
-	// Preserve a text glyph so the original label is not lost.
-	value := strings.TrimSpace(firstNonEmpty(item.Logo, item.Icon, item.IconURL, item.Favicon))
-	if value != "" && !IsDataURI(value) && security.ValidateHTTPURL(value) != nil {
-		parts = append(parts, value)
+	// Keep an unmatched `si` searchable; a matched one becomes the icon.
+	if si := strings.TrimSpace(item.SI); si != "" && !siUsedAsIcon {
+		parts = append(parts, si)
 	}
 	return strings.Join(parts, ",")
+}
+
+func buildLegacyTags(item legacyItem) string {
+	parts := []string{}
+	for _, v := range []string{item.Tag, item.Tags} {
+		if trimmed := strings.TrimSpace(v); trimmed != "" {
+			parts = append(parts, trimmed)
+		}
+	}
+	return strings.Join(parts, ",")
+}
+
+// normalizeLegacyColor accepts a legacy hex colour, dropping anything invalid.
+func normalizeLegacyColor(value string, stats *legacyStats) string {
+	v := strings.TrimSpace(value)
+	if v == "" {
+		return ""
+	}
+	if hexColorPattern.MatchString(v) {
+		stats.colorsMapped++
+		return v
+	}
+	stats.colorsUnmapped++
+	return ""
 }
 
 func legacyWarnings(stats *legacyStats) []string {
@@ -367,23 +404,31 @@ func legacyWarnings(stats *legacyStats) []string {
 	}
 	if stats.textIcons > 0 {
 		warnings = append(warnings, fmt.Sprintf(
-			"%d 个文本型图标（如「延迟」）无法作为图片，已设为无图标并把文本保留到关键词", stats.textIcons))
+			"%d 个文字型图标（如「延迟」）已保留为 icon_type=text", stats.textIcons))
 	}
-	if stats.siMapped > 0 {
+	if stats.siAsIcon > 0 {
 		warnings = append(warnings, fmt.Sprintf(
-			"%d 项旧站字段 si（图标标识）已合并到关键词", stats.siMapped))
+			"%d 项旧站字段 si 已匹配到可用的 Simple Icons 图标（icon_type=simple）", stats.siAsIcon))
 	}
-	if stats.tagMapped > 0 {
+	if stats.siUnmatched > 0 {
 		warnings = append(warnings, fmt.Sprintf(
-			"%d 项旧站字段 tag 已合并到关键词", stats.tagMapped))
+			"%d 项旧站字段 si 不是可用的 Simple Icons 标识，已保留到关键词", stats.siUnmatched))
 	}
-	if stats.colorUnmapped > 0 {
+	if stats.faviconIcons > 0 {
 		warnings = append(warnings, fmt.Sprintf(
-			"%d 项旧站字段 color 未映射（当前数据模型没有对应字段）", stats.colorUnmapped))
+			"%d 项标记为 favicon 的图标改为显示时回退（不抓取、不覆盖）", stats.faviconIcons))
 	}
-	if stats.categoryIconUnmapped > 0 {
-		warnings = append(warnings, fmt.Sprintf(
-			"%d 个分类图标（emoji）未映射（当前数据模型没有对应字段）", stats.categoryIconUnmapped))
+	if stats.tagsMapped > 0 {
+		warnings = append(warnings, fmt.Sprintf("%d 项旧站 tag 已迁移到 tags 字段", stats.tagsMapped))
+	}
+	if stats.categoryIcons > 0 {
+		warnings = append(warnings, fmt.Sprintf("%d 个分类 emoji 图标已迁移到 categories.icon", stats.categoryIcons))
+	}
+	if stats.colorsMapped > 0 {
+		warnings = append(warnings, fmt.Sprintf("%d 项颜色已迁移到 color 字段", stats.colorsMapped))
+	}
+	if stats.colorsUnmapped > 0 {
+		warnings = append(warnings, fmt.Sprintf("%d 项颜色格式非法，已忽略", stats.colorsUnmapped))
 	}
 	if stats.missingName > 0 {
 		warnings = append(warnings, fmt.Sprintf("%d 个条目缺少名称，已忽略", stats.missingName))
@@ -397,13 +442,18 @@ func legacyWarnings(stats *legacyStats) []string {
 // --- icon preparation ---
 
 type iconStats struct {
-	kept      int
-	converted int
-	dropped   int
+	kept           int
+	converted      int
+	simple         int
+	text           int
+	favicon        int
+	dropped        int
+	createdUploads []string
 }
 
 // sanitizeIcons validates icon values and, when convert is true, materialises
-// embedded data: URIs into uploaded files.
+// embedded data: URIs into uploaded files. Uploads created here are tracked so
+// they can be removed if the surrounding import fails.
 func (t *TransferService) sanitizeIcons(ctx context.Context, bundle *models.ExportBundle, convert bool) (iconStats, []string, error) {
 	stats := iconStats{}
 	warnings := []string{}
@@ -411,10 +461,41 @@ func (t *TransferService) sanitizeIcons(ctx context.Context, bundle *models.Expo
 
 	for i := range bundle.Bookmarks {
 		b := &bundle.Bookmarks[i]
-		value := strings.TrimSpace(b.IconValue)
 
-		if value == "" || b.IconType == "none" {
+		// Types that intentionally carry no stored value.
+		switch b.IconType {
+		case "", "none", "auto":
 			b.IconType, b.IconValue = "none", ""
+			continue
+		case "favicon":
+			b.IconType, b.IconValue = "favicon", ""
+			stats.favicon++
+			continue
+		}
+
+		value := strings.TrimSpace(b.IconValue)
+		if value == "" {
+			b.IconType, b.IconValue = "none", ""
+			continue
+		}
+
+		switch b.IconType {
+		case "text":
+			runes := []rune(value)
+			if len(runes) > maxIconTextRunes {
+				runes = runes[:maxIconTextRunes]
+			}
+			b.IconValue = string(runes)
+			stats.text++
+			continue
+		case "simple":
+			if IsSimpleIconSlug(value) {
+				b.IconValue = strings.ToLower(value)
+				stats.simple++
+				continue
+			}
+			b.IconType, b.IconValue = "none", ""
+			stats.dropped++
 			continue
 		}
 
@@ -440,6 +521,7 @@ func (t *TransferService) sanitizeIcons(ctx context.Context, bundle *models.Expo
 			b.IconType = "upload"
 			b.IconValue = UploadURL(upload.Filename)
 			stats.converted++
+			stats.createdUploads = append(stats.createdUploads, upload.Filename)
 			continue
 		}
 
@@ -459,13 +541,33 @@ func (t *TransferService) sanitizeIcons(ctx context.Context, bundle *models.Expo
 	if stats.converted > 0 {
 		warnings = append(warnings, fmt.Sprintf("%d 个内嵌图标已转换为本地上传（icon_type=upload）", stats.converted))
 	}
+	if stats.simple > 0 {
+		warnings = append(warnings, fmt.Sprintf("%d 个图标来自 Simple Icons（icon_type=simple）", stats.simple))
+	}
+	if stats.text > 0 {
+		warnings = append(warnings, fmt.Sprintf("%d 个文字型图标（icon_type=text）", stats.text))
+	}
+	if stats.favicon > 0 {
+		warnings = append(warnings, fmt.Sprintf("%d 个图标使用网站 Favicon 回退（icon_type=favicon）", stats.favicon))
+	}
 	if failed > 0 {
 		warnings = append(warnings, fmt.Sprintf("%d 个内嵌图标转换失败，已设为无图标", failed))
 	}
 	if stats.dropped > 0 {
-		warnings = append(warnings, fmt.Sprintf("%d 个图标值无效，已设为无图标（原值保留在导入数据中）", stats.dropped))
+		warnings = append(warnings, fmt.Sprintf("%d 个图标值无效，已设为无图标", stats.dropped))
 	}
 	return stats, warnings, nil
+}
+
+// cleanupUploads removes icon files (and their metadata) created during a
+// failed import, so a rolled-back import leaves nothing behind.
+func (t *TransferService) cleanupUploads(ctx context.Context, filenames []string) {
+	if t.icons == nil {
+		return
+	}
+	for _, name := range filenames {
+		_ = t.icons.DeleteUpload(ctx, name)
+	}
 }
 
 // filterValidBookmarks removes bookmarks whose URL is not an allowed http(s)
@@ -516,12 +618,19 @@ func (t *TransferService) Preview(ctx context.Context, raw []byte) (*models.Impo
 		BookmarksInvalid:   invalid,
 		IconsKept:          iconStats.kept,
 		IconsConverted:     iconStats.converted,
+		IconsSimple:        iconStats.simple,
+		IconsText:          iconStats.text,
+		IconsFavicon:       iconStats.favicon,
 		IconsDropped:       iconStats.dropped,
 		Warnings:           warnings,
 	}, nil
 }
 
 // Import applies a bundle using the given conflict strategy.
+//
+// The database write happens in a single transaction. Icon files created for
+// embedded data URIs are removed again if the transaction fails, so a failed
+// import leaves neither partial data nor orphan files.
 func (t *TransferService) Import(ctx context.Context, raw []byte, strategy string) (*models.ImportResult, error) {
 	switch strategy {
 	case "", store.ImportSkip, store.ImportOverwrite, store.ImportRename:
@@ -536,7 +645,9 @@ func (t *TransferService) Import(ctx context.Context, raw []byte, strategy strin
 	}
 
 	invalid := filterValidBookmarks(bundle)
-	if _, _, err := t.sanitizeIcons(ctx, bundle, true); err != nil {
+	iconStats, _, err := t.sanitizeIcons(ctx, bundle, true)
+	if err != nil {
+		t.cleanupUploads(ctx, iconStats.createdUploads)
 		return nil, err
 	}
 
@@ -554,6 +665,7 @@ func (t *TransferService) Import(ctx context.Context, raw []byte, strategy strin
 
 	result, err := t.store.ImportData(ctx, bundle.Categories, bundle.Bookmarks, settings, strategy)
 	if err != nil {
+		t.cleanupUploads(ctx, iconStats.createdUploads)
 		return nil, err
 	}
 	result.Skipped += invalid

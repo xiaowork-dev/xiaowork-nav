@@ -11,7 +11,7 @@ import (
 )
 
 const bookmarkColumns = `b.id, b.category_id, b.title, b.url, b.description, b.icon_type, b.icon_value,
-    b.keywords, b.sort_order, b.is_visible, b.open_in_new_tab, b.created_at, b.updated_at`
+    b.keywords, b.tags, b.color, b.sort_order, b.is_visible, b.open_in_new_tab, b.created_at, b.updated_at`
 
 // BookmarkFilter selects and paginates bookmarks.
 type BookmarkFilter struct {
@@ -116,9 +116,9 @@ func (s *Store) CreateBookmark(ctx context.Context, b *models.Bookmark) (*models
 	now := models.NowUTC()
 	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO bookmarks
-            (category_id, title, url, description, icon_type, icon_value, keywords, sort_order, is_visible, open_in_new_tab, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		b.CategoryID, b.Title, b.URL, b.Description, b.IconType, b.IconValue, b.Keywords,
+            (category_id, title, url, description, icon_type, icon_value, keywords, tags, color, sort_order, is_visible, open_in_new_tab, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		b.CategoryID, b.Title, b.URL, b.Description, b.IconType, b.IconValue, b.Keywords, b.Tags, b.Color,
 		b.SortOrder, boolToInt(b.IsVisible), boolToInt(b.OpenInNewTab), now, now,
 	)
 	if err != nil {
@@ -135,9 +135,9 @@ func (s *Store) CreateBookmark(ctx context.Context, b *models.Bookmark) (*models
 func (s *Store) UpdateBookmark(ctx context.Context, b *models.Bookmark) (*models.Bookmark, error) {
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE bookmarks SET category_id = ?, title = ?, url = ?, description = ?, icon_type = ?, icon_value = ?,
-            keywords = ?, sort_order = ?, is_visible = ?, open_in_new_tab = ?, updated_at = ?
+            keywords = ?, tags = ?, color = ?, sort_order = ?, is_visible = ?, open_in_new_tab = ?, updated_at = ?
          WHERE id = ?`,
-		b.CategoryID, b.Title, b.URL, b.Description, b.IconType, b.IconValue, b.Keywords,
+		b.CategoryID, b.Title, b.URL, b.Description, b.IconType, b.IconValue, b.Keywords, b.Tags, b.Color,
 		b.SortOrder, boolToInt(b.IsVisible), boolToInt(b.OpenInNewTab), models.NowUTC(), b.ID,
 	)
 	if err != nil {
@@ -225,11 +225,11 @@ func (s *Store) ListNavigation(ctx context.Context) ([]models.Category, error) {
 
 func scanBookmark(sc scanner) (models.Bookmark, error) {
 	var (
-		b                     models.Bookmark
-		desc, iconVal, kw     sql.NullString
-		visible, openNewTab   int
+		b                                 models.Bookmark
+		desc, iconVal, kw, tags, color    sql.NullString
+		visible, openNewTab               int
 	)
-	err := sc.Scan(&b.ID, &b.CategoryID, &b.Title, &b.URL, &desc, &b.IconType, &iconVal, &kw,
+	err := sc.Scan(&b.ID, &b.CategoryID, &b.Title, &b.URL, &desc, &b.IconType, &iconVal, &kw, &tags, &color,
 		&b.SortOrder, &visible, &openNewTab, &b.CreatedAt, &b.UpdatedAt)
 	if err != nil {
 		return b, err
@@ -237,6 +237,8 @@ func scanBookmark(sc scanner) (models.Bookmark, error) {
 	b.Description = desc.String
 	b.IconValue = iconVal.String
 	b.Keywords = kw.String
+	b.Tags = tags.String
+	b.Color = color.String
 	b.IsVisible = intToBool(visible)
 	b.OpenInNewTab = intToBool(openNewTab)
 	return b, nil

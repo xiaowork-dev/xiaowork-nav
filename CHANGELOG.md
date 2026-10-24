@@ -7,6 +7,9 @@
 ### Added — P3（Vue 3 前端功能与联调）
 
 - **导航首页**：时钟、搜索引擎切换搜索框、分类分组与图标磁贴、主题切换、响应式布局。
+- **图标显示链**：用户图标（url/upload/simple/text）→ 站点 Favicon → 首字母占位；自动步骤仅为显示回退，不改写已存储的图标地址。
+- **数据模型扩展**（迁移 `0002`，非破坏性加列）：`categories.icon` / `categories.color` / `bookmarks.tags` / `bookmarks.color`；`icon_type` 扩展为 `none|url|upload|auto|favicon|simple|text`。
+- **Simple Icons 校验**：内置 3,494 个官方 slug 白名单（`go:embed`），只有命中白名单的 `si` 才映射为 `icon_type=simple`。
 - **搜索**：调用后端 `/api/v1/public/search`（防抖），失败回退本地过滤；回车使用所选引擎搜索。
 - **初始化与认证**：首次初始化向导、管理员登录/退出、路由守卫（未初始化强制向导；管理路由未登录跳转并携带 `redirect`）。
 - **分类管理**：增删改、公开/私有切换、拖拽排序与移动端 ↑↓ 排序、删除二次确认。
@@ -29,6 +32,9 @@
 - 导入时分类 `sort_order` 被硬编码为 0（现按导入顺序写入 10,20,30…）。
 - 导入冲突检测改为按分类名解析后比对 URL（此前使用数据包内 ID，可能误判）。
 - 书签引用未知分类时改为跳过，不再猜测可能撞车的 ID。
+- 内嵌 data URI 图标导入失败时不再遗留孤儿文件与上传记录（事务失败即清理）。
+- 上传的 SVG 内容校验改为必须包含 `<svg` 根元素，防止 HTML 伪装成图标。
+- `sanitizeIcons` 中"空值即无图标"的判断先于 favicon 分支，导致 `favicon` 类型被误降级。
 
 ### Added — P2（Go 后端核心业务）
 

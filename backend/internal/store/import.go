@@ -59,7 +59,7 @@ func (s *Store) ImportData(ctx context.Context, cats []models.Category, bookmark
 				result.CategoriesImported++
 				catIDMap[c.ID] = existingID
 			case ImportRename:
-				newID, err := insertCategory(ctx, tx, name+" (导入)", c.Description, c.SortOrder, c.IsVisible, now)
+				newID, err := insertCategory(ctx, tx, name+" (导入)", c.Description, c.Icon, c.Color, c.SortOrder, c.IsVisible, now)
 				if err != nil {
 					return result, err
 				}
@@ -71,7 +71,7 @@ func (s *Store) ImportData(ctx context.Context, cats []models.Category, bookmark
 			}
 			continue
 		}
-		newID, err := insertCategory(ctx, tx, name, c.Description, c.SortOrder, c.IsVisible, now)
+		newID, err := insertCategory(ctx, tx, name, c.Description, c.Icon, c.Color, c.SortOrder, c.IsVisible, now)
 		if err != nil {
 			return result, err
 		}
@@ -208,11 +208,11 @@ func categoryNameIndex(ctx context.Context, q querier) (map[string]int64, error)
 	return out, rows.Err()
 }
 
-func insertCategory(ctx context.Context, tx *sql.Tx, name, description string, sortOrder int, isVisible bool, now string) (int64, error) {
+func insertCategory(ctx context.Context, tx *sql.Tx, name, description, icon, color string, sortOrder int, isVisible bool, now string) (int64, error) {
 	res, err := tx.ExecContext(ctx,
-		`INSERT INTO categories (name, description, sort_order, is_visible, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-		name, description, sortOrder, boolToInt(isVisible), now, now,
+		`INSERT INTO categories (name, description, icon, color, sort_order, is_visible, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		name, description, icon, color, sortOrder, boolToInt(isVisible), now, now,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("insert category %q: %w", name, err)
@@ -236,9 +236,9 @@ func bookmarkIDByURL(ctx context.Context, q querier, categoryID int64, url strin
 func insertBookmark(ctx context.Context, tx *sql.Tx, categoryID int64, title string, b models.Bookmark, now string) error {
 	_, err := tx.ExecContext(ctx,
 		`INSERT INTO bookmarks
-            (category_id, title, url, description, icon_type, icon_value, keywords, sort_order, is_visible, open_in_new_tab, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		categoryID, title, b.URL, b.Description, b.IconType, b.IconValue, b.Keywords,
+            (category_id, title, url, description, icon_type, icon_value, keywords, tags, color, sort_order, is_visible, open_in_new_tab, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		categoryID, title, b.URL, b.Description, b.IconType, b.IconValue, b.Keywords, b.Tags, b.Color,
 		b.SortOrder, boolToInt(b.IsVisible), boolToInt(b.OpenInNewTab), now, now,
 	)
 	if err != nil {

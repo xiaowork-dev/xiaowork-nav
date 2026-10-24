@@ -9,7 +9,7 @@ import (
 	"github.com/xiaowork-dev/xiaowork-nav/backend/internal/models"
 )
 
-const categoryColumns = `c.id, c.name, c.description, c.sort_order, c.is_visible, c.created_at, c.updated_at`
+const categoryColumns = `c.id, c.name, c.description, c.icon, c.color, c.sort_order, c.is_visible, c.created_at, c.updated_at`
 
 // ListCategories returns categories ordered by sort_order.
 //
@@ -70,9 +70,9 @@ func (s *Store) CategoryExists(ctx context.Context, id int64) (bool, error) {
 func (s *Store) CreateCategory(ctx context.Context, c *models.Category) (*models.Category, error) {
 	now := models.NowUTC()
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO categories (name, description, sort_order, is_visible, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-		c.Name, c.Description, c.SortOrder, boolToInt(c.IsVisible), now, now,
+		`INSERT INTO categories (name, description, icon, color, sort_order, is_visible, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.Name, c.Description, c.Icon, c.Color, c.SortOrder, boolToInt(c.IsVisible), now, now,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("insert category: %w", err)
@@ -90,9 +90,9 @@ func (s *Store) CreateCategory(ctx context.Context, c *models.Category) (*models
 // UpdateCategory replaces the editable fields of a category.
 func (s *Store) UpdateCategory(ctx context.Context, c *models.Category) (*models.Category, error) {
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE categories SET name = ?, description = ?, sort_order = ?, is_visible = ?, updated_at = ?
+		`UPDATE categories SET name = ?, description = ?, icon = ?, color = ?, sort_order = ?, is_visible = ?, updated_at = ?
          WHERE id = ?`,
-		c.Name, c.Description, c.SortOrder, boolToInt(c.IsVisible), models.NowUTC(), c.ID,
+		c.Name, c.Description, c.Icon, c.Color, c.SortOrder, boolToInt(c.IsVisible), models.NowUTC(), c.ID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("update category: %w", err)
@@ -156,15 +156,18 @@ type scanner interface {
 
 func scanCategory(sc scanner) (models.Category, error) {
 	var (
-		c       models.Category
-		visible int
-		count   int
-		desc    sql.NullString
+		c          models.Category
+		visible    int
+		count      int
+		desc, icon sql.NullString
+		color      sql.NullString
 	)
-	if err := sc.Scan(&c.ID, &c.Name, &desc, &c.SortOrder, &visible, &c.CreatedAt, &c.UpdatedAt, &count); err != nil {
+	if err := sc.Scan(&c.ID, &c.Name, &desc, &icon, &color, &c.SortOrder, &visible, &c.CreatedAt, &c.UpdatedAt, &count); err != nil {
 		return c, err
 	}
 	c.Description = desc.String
+	c.Icon = icon.String
+	c.Color = color.String
 	c.IsVisible = intToBool(visible)
 	c.BookmarkCount = count
 	return c, nil

@@ -7,7 +7,7 @@
  */
 
 export type Theme = 'light' | 'dark' | 'auto'
-export type IconType = 'none' | 'url' | 'upload' | 'auto'
+export type IconType = 'none' | 'url' | 'upload' | 'auto' | 'favicon' | 'simple' | 'text'
 export type HomepageLayout = 'grid' | 'list'
 export type ConflictStrategy = 'skip' | 'overwrite' | 'rename'
 
@@ -40,6 +40,8 @@ export interface Category {
   id: number
   name: string
   description: string
+  icon: string
+  color: string
   sort_order: number
   is_visible: boolean
   bookmark_count?: number
@@ -51,6 +53,8 @@ export interface Category {
 export interface CategoryInput {
   name: string
   description?: string
+  icon?: string
+  color?: string
   sort_order?: number
   is_visible?: boolean
 }
@@ -64,6 +68,8 @@ export interface Bookmark {
   icon_type: IconType
   icon_value: string
   keywords: string
+  tags: string
+  color: string
   sort_order: number
   is_visible: boolean
   open_in_new_tab: boolean
@@ -79,6 +85,8 @@ export interface BookmarkInput {
   icon_type?: IconType
   icon_value?: string
   keywords?: string
+  tags?: string
+  color?: string
   sort_order?: number
   is_visible?: boolean
   open_in_new_tab?: boolean
@@ -158,6 +166,9 @@ export interface ImportPreview {
   bookmarks_invalid?: number
   icons_kept?: number
   icons_converted?: number
+  icons_simple?: number
+  icons_text?: number
+  icons_favicon?: number
   icons_dropped?: number
   warnings?: string[]
 }
