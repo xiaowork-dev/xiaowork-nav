@@ -1,0 +1,21 @@
+# Build artifacts
+**/node_modules
+**/dist
+**/.vite
+**/*.tsbuildinfo
+/backend/bin
+/data
+.git
+.gitignore
+.github
+docs
+*.md
+!README.md
+.env
+.env.*
+!.env.example
+deploy/.env
+*.db
+*.db-wal
+*.db-shm
+*.log

@@ -1,0 +1,29 @@
+{
+  "name": "xiaowork-nav-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "XiaoWork Nav frontend (Vue 3 + TypeScript + Vite). Talks to the backend only via /api/v1.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "build:only": "vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit",
+    "gen:types": "openapi-typescript ../docs/openapi/openapi.yaml -o src/types/openapi.d.ts",
+    "mock": "prism mock ../docs/openapi/openapi.yaml -p 8080"
+  },
+  "dependencies": {
+    "pinia": "^2.3.0",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "openapi-typescript": "^7.5.0",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.7",
+    "vue-tsc": "^2.2.0"
+  }
+}

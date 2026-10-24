@@ -1,0 +1,42 @@
+# XiaoWork Nav — standalone Docker Compose deployment.
+#
+# Default: bind to 127.0.0.1 so the app is only reachable through a reverse
+# proxy on the same host. To expose publicly (not recommended without TLS),
+# set XN_BIND_ADDR=0.0.0.0.
+#
+# Usage:
+#   cp .env.example .env && edit .env
+#   ../scripts/deploy.sh
+
+name: xiaowork-nav
+
+services:
+  app:
+    image: ${XN_IMAGE:-ghcr.io/xiaowork-dev/xiaowork-nav}:${APP_VERSION:-latest}
+    container_name: ${XN_CONTAINER_NAME:-xiaowork-nav}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      XN_DATA_DIR: /data
+      XN_HOST: 0.0.0.0
+      XN_PORT: "8080"
+      XN_LOG_LEVEL: ${XN_LOG_LEVEL:-info}
+      XN_ALLOW_GUEST_ACCESS: ${XN_ALLOW_GUEST_ACCESS:-true}
+      XN_TRUSTED_PROXIES: ${XN_TRUSTED_PROXIES:-}
+      XN_ALLOWED_ORIGINS: ${XN_ALLOWED_ORIGINS:-}
+    ports:
+      - "${XN_BIND_ADDR:-127.0.0.1}:${XN_PUBLISH_PORT:-8787}:8080"
+    volumes:
+      - ${XN_DATA_HOST_DIR:-./data}:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

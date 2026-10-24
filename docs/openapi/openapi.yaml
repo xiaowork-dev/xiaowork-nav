@@ -1,0 +1,1127 @@
+openapi: 3.1.0
+
+info:
+  title: XiaoWork Nav API
+  version: 1.0.0
+  description: |
+    XiaoWork Nav V2.0 后端 REST API 契约。
+
+    **本文件是前后端唯一事实来源：**
+    - 后端实现必须与本契约一致；
+    - 前端应使用 `openapi-typescript` 生成本文件的类型；
+    - 前端可在无后端时使用 Prism Mock 联调。
+
+    约定（详见 `docs/api-spec.md`）：
+    - 基础路径 `/api/v1`；`/healthz` 为不带版本前缀的健康检查。
+    - 公开接口在 `/public/*`（匿名可读），认证接口在 `/auth/*`，管理接口在 `/admin/*`（需会话 Cookie）。
+    - 成功响应直接返回资源对象；集合使用 `{items,total,page,page_size}` 包装。
+    - 所有错误统一返回 `ErrorResponse`；每个操作都可能返回该错误体。
+    - 状态变更请求（POST/PATCH/PUT/DELETE）应携带 `X-Requested-With: XMLHttpRequest`。
+  contact:
+    name: XiaoWork Nav
+    url: https://github.com/xiaowork-dev/xiaowork-nav
+  license:
+    name: MIT
+
+servers:
+  - url: /api/v1
+    description: 业务 API（相对当前源）
+
+tags:
+  - name: system
+    description: 健康检查与版本
+  - name: auth
+    description: 认证与会话
+  - name: public
+    description: 公开只读接口（匿名）
+  - name: admin
+    description: 管理接口（需会话）
+
+security:
+  - cookieAuth: []
+
+paths:
+  /healthz:
+    get:
+      tags: [system]
+      operationId: getHealth
+      summary: 健康检查（不带版本前缀）
+      security: []
+      servers:
+        - url: /
+      responses:
+        '200':
+          description: 服务正常
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthResponse' }
+
+  /version:
+    get:
+      tags: [system]
+      operationId: getVersion
+      summary: 当前版本与构建信息
+      security: []
+      responses:
+        '200':
+          description: 版本信息
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VersionInfo' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /auth/status:
+    get:
+      tags: [auth]
+      operationId: getAuthStatus
+      summary: 初始化与登录状态
+      security: []
+      responses:
+        '200':
+          description: 状态
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthStatus' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /setup:
+    post:
+      tags: [auth]
+      operationId: setupAdmin
+      summary: 首次初始化管理员（仅未初始化时可用，初始化后永久关闭）
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetupRequest' }
+      responses:
+        '201':
+          description: 初始化成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+        default: { $ref: '#/components/responses/Error' }
+
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: 登录
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default: { $ref: '#/components/responses/Error' }
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: 登出
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204': { description: 已登出 }
+        default: { $ref: '#/components/responses/Error' }
+
+  /auth/me:
+    get:
+      tags: [auth]
+      operationId: getCurrentUser
+      summary: 当前用户信息
+      responses:
+        '200':
+          description: 当前用户
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default: { $ref: '#/components/responses/Error' }
+
+  /auth/password:
+    put:
+      tags: [auth]
+      operationId: changePassword
+      summary: 修改密码
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
+      responses:
+        '204': { description: 修改成功 }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default: { $ref: '#/components/responses/Error' }
+
+  /public/navigation:
+    get:
+      tags: [public]
+      operationId: getPublicNavigation
+      summary: 首页导航树（可见分类 + 可见导航项 + 公开设置）
+      security: []
+      responses:
+        '200':
+          description: 导航数据
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NavigationResponse' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /public/categories:
+    get:
+      tags: [public]
+      operationId: listPublicCategories
+      summary: 可见分类列表
+      security: []
+      responses:
+        '200':
+          description: 分类集合
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryList' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /public/categories/{id}/bookmarks:
+    get:
+      tags: [public]
+      operationId: listPublicBookmarksByCategory
+      summary: 某分类下可见导航项
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PathID'
+      responses:
+        '200':
+          description: 导航项集合
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookmarkList' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default: { $ref: '#/components/responses/Error' }
+
+  /public/search:
+    get:
+      tags: [public]
+      operationId: searchPublicBookmarks
+      summary: 搜索可见导航项（名称/描述/关键词）
+      security: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 1 }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: 搜索结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookmarkList' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /public/settings:
+    get:
+      tags: [public]
+      operationId: getPublicSettings
+      summary: 公开站点设置
+      security: []
+      responses:
+        '200':
+          description: 公开设置
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicSettings' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/categories:
+    get:
+      tags: [admin]
+      operationId: listCategories
+      summary: 全部分类（含私有）
+      responses:
+        '200':
+          description: 分类集合
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      tags: [admin]
+      operationId: createCategory
+      summary: 新建分类
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryInput' }
+      responses:
+        '201':
+          description: 已创建
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/categories/order:
+    put:
+      tags: [admin]
+      operationId: reorderCategories
+      summary: 提交分类排序（单事务应用）
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrderRequest' }
+      responses:
+        '200':
+          description: 排序已应用
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/categories/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathID'
+    get:
+      tags: [admin]
+      operationId: getCategory
+      summary: 分类详情
+      responses:
+        '200':
+          description: 分类
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        default: { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [admin]
+      operationId: updateCategory
+      summary: 更新分类（部分字段）
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryPatch' }
+      responses:
+        '200':
+          description: 已更新
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [admin]
+      operationId: deleteCategory
+      summary: 删除分类（级联删除其导航项）
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204': { description: 已删除 }
+        '404': { $ref: '#/components/responses/NotFound' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/bookmarks:
+    get:
+      tags: [admin]
+      operationId: listBookmarks
+      summary: 导航项列表（分页/过滤）
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: category_id
+          in: query
+          schema: { type: integer }
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: is_visible
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: 导航项集合
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookmarkList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      tags: [admin]
+      operationId: createBookmark
+      summary: 新建导航项
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookmarkInput' }
+      responses:
+        '201':
+          description: 已创建
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bookmark' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/bookmarks/order:
+    put:
+      tags: [admin]
+      operationId: reorderBookmarks
+      summary: 提交导航项排序（单事务应用）
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrderRequest' }
+      responses:
+        '200':
+          description: 排序已应用
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/bookmarks/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathID'
+    get:
+      tags: [admin]
+      operationId: getBookmark
+      summary: 导航项详情
+      responses:
+        '200':
+          description: 导航项
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bookmark' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        default: { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [admin]
+      operationId: updateBookmark
+      summary: 更新导航项（部分字段）
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookmarkPatch' }
+      responses:
+        '200':
+          description: 已更新
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bookmark' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [admin]
+      operationId: deleteBookmark
+      summary: 删除导航项
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204': { description: 已删除 }
+        '404': { $ref: '#/components/responses/NotFound' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/bookmarks/{id}/move:
+    post:
+      tags: [admin]
+      operationId: moveBookmark
+      summary: 移动到其它分类
+      parameters:
+        - $ref: '#/components/parameters/PathID'
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MoveRequest' }
+      responses:
+        '200':
+          description: 已移动
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bookmark' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/settings:
+    get:
+      tags: [admin]
+      operationId: getAdminSettings
+      summary: 读取全部设置
+      responses:
+        '200':
+          description: 设置
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminSettings' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        default: { $ref: '#/components/responses/Error' }
+    put:
+      tags: [admin]
+      operationId: updateAdminSettings
+      summary: 批量更新设置（仅提交提供的字段）
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminSettings' }
+      responses:
+        '200':
+          description: 已更新
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminSettings' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/uploads/icon:
+    post:
+      tags: [admin]
+      operationId: uploadIcon
+      summary: 上传图标文件（≤1MiB，校验类型）
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required: [file]
+      responses:
+        '201':
+          description: 上传成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UploadResult' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/icons/fetch:
+    post:
+      tags: [admin]
+      operationId: fetchIcon
+      summary: 服务端抓取站点图标（防 SSRF）
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url: { type: string, format: uri, maxLength: 2048 }
+              required: [url]
+      responses:
+        '200':
+          description: 抓取结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IconRef' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/export:
+    get:
+      tags: [admin]
+      operationId: exportData
+      summary: 导出 JSON 数据
+      responses:
+        '200':
+          description: 导出数据
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExportBundle' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/import/preview:
+    post:
+      tags: [admin]
+      operationId: previewImport
+      summary: 导入预览（不写库）
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExportBundle' }
+      responses:
+        '200':
+          description: 预览结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportPreview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/import:
+    post:
+      tags: [admin]
+      operationId: runImport
+      summary: 执行导入（单事务；默认不覆盖已有数据）
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportRequest' }
+      responses:
+        '200':
+          description: 导入结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportResult' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/backups:
+    get:
+      tags: [admin]
+      operationId: listBackups
+      summary: 备份快照列表
+      responses:
+        '200':
+          description: 快照集合
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Backup' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      tags: [admin]
+      operationId: createBackup
+      summary: 立即创建备份
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '201':
+          description: 已创建
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Backup' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/backups/{id}/restore:
+    post:
+      tags: [admin]
+      operationId: restoreBackup
+      summary: 从快照恢复（恢复前自动备份当前数据）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          description: 恢复成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderResult' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/update-check:
+    get:
+      tags: [admin]
+      operationId: checkUpdate
+      summary: 检查最新版本（只读，不执行更新）
+      responses:
+        '200':
+          description: 版本信息
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UpdateInfo' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        default: { $ref: '#/components/responses/Error' }
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: xiaowork_session
+      description: 服务端会话 Cookie（HttpOnly / SameSite=Lax / 生产 HTTPS 下 Secure）
+
+  parameters:
+    PathID:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: page_size
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    CsrfHeader:
+      name: X-Requested-With
+      in: header
+      required: false
+      schema: { type: string, enum: [XMLHttpRequest], default: XMLHttpRequest }
+      description: CSRF 附加信号，前端状态变更请求应携带。
+
+  responses:
+    Error:
+      description: 统一错误响应（具体状态码见 error.code 与 `docs/api-spec.md`）
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    BadRequest:
+      description: 参数校验失败
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Unauthorized:
+      description: 未认证或会话失效
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Conflict:
+      description: 冲突
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    TooLarge:
+      description: 请求体或文件过大
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    TooManyRequests:
+      description: 触发限流
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Unprocessable:
+      description: 语义错误
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: 稳定错误码，见 `docs/api-spec.md` 附录 A
+              example: validation_failed
+            message: { type: string }
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field: { type: string }
+                  issue: { type: string }
+            request_id: { type: string }
+          required: [code, message]
+      required: [error]
+
+    HealthResponse:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+        version: { type: string, example: 2.0.0 }
+      required: [status]
+
+    VersionInfo:
+      type: object
+      properties:
+        version: { type: string }
+        commit: { type: string }
+        build_time: { type: string }
+        schema_version: { type: integer }
+      required: [version]
+
+    ListMeta:
+      type: object
+      properties:
+        total: { type: integer }
+        page: { type: integer }
+        page_size: { type: integer }
+      required: [total]
+
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        username: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+      required: [id, username]
+
+    AuthStatus:
+      type: object
+      properties:
+        initialized: { type: boolean, description: 是否已创建管理员 }
+        authenticated: { type: boolean }
+        user: { $ref: '#/components/schemas/User' }
+      required: [initialized, authenticated]
+
+    SetupRequest:
+      type: object
+      properties:
+        username: { type: string, minLength: 3, maxLength: 32 }
+        password: { type: string, minLength: 8, maxLength: 128 }
+      required: [username, password]
+
+    LoginRequest:
+      type: object
+      properties:
+        username: { type: string }
+        password: { type: string }
+      required: [username, password]
+
+    ChangePasswordRequest:
+      type: object
+      properties:
+        current_password: { type: string }
+        new_password: { type: string, minLength: 8, maxLength: 128 }
+      required: [current_password, new_password]
+
+    Category:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: string }
+        sort_order: { type: integer }
+        is_visible: { type: boolean, description: 'false = 私有，仅管理员可见' }
+        bookmark_count: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+      required: [id, name, sort_order, is_visible]
+
+    CategoryInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 64 }
+        description: { type: string, maxLength: 512 }
+        sort_order: { type: integer }
+        is_visible: { type: boolean }
+      required: [name]
+
+    CategoryPatch:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 64 }
+        description: { type: string, maxLength: 512 }
+        sort_order: { type: integer }
+        is_visible: { type: boolean }
+
+    CategoryList:
+      allOf:
+        - $ref: '#/components/schemas/ListMeta'
+        - type: object
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/Category' }
+
+    Bookmark:
+      type: object
+      properties:
+        id: { type: integer }
+        category_id: { type: integer }
+        title: { type: string }
+        url: { type: string, format: uri }
+        description: { type: string }
+        icon_type:
+          type: string
+          enum: [none, url, upload, auto]
+          description: none=无 / url=远程地址 / upload=本地上传 / auto=服务端抓取
+        icon_value: { type: string }
+        keywords: { type: string }
+        sort_order: { type: integer }
+        is_visible: { type: boolean, description: 'false = 私有，仅管理员可见' }
+        open_in_new_tab: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+      required: [id, category_id, title, url, sort_order, is_visible, open_in_new_tab]
+
+    BookmarkInput:
+      type: object
+      properties:
+        category_id: { type: integer }
+        title: { type: string, minLength: 1, maxLength: 128 }
+        url: { type: string, format: uri, maxLength: 2048 }
+        description: { type: string, maxLength: 512 }
+        icon_type: { type: string, enum: [none, url, upload, auto] }
+        icon_value: { type: string, maxLength: 2048 }
+        keywords: { type: string, maxLength: 512 }
+        sort_order: { type: integer }
+        is_visible: { type: boolean }
+        open_in_new_tab: { type: boolean }
+      required: [category_id, title, url]
+
+    BookmarkPatch:
+      type: object
+      properties:
+        category_id: { type: integer }
+        title: { type: string, minLength: 1, maxLength: 128 }
+        url: { type: string, format: uri, maxLength: 2048 }
+        description: { type: string, maxLength: 512 }
+        icon_type: { type: string, enum: [none, url, upload, auto] }
+        icon_value: { type: string, maxLength: 2048 }
+        keywords: { type: string, maxLength: 512 }
+        sort_order: { type: integer }
+        is_visible: { type: boolean }
+        open_in_new_tab: { type: boolean }
+
+    BookmarkList:
+      allOf:
+        - $ref: '#/components/schemas/ListMeta'
+        - type: object
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/Bookmark' }
+
+    NavigationResponse:
+      type: object
+      properties:
+        categories:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/Category'
+              - type: object
+                properties:
+                  bookmarks:
+                    type: array
+                    items: { $ref: '#/components/schemas/Bookmark' }
+        settings: { $ref: '#/components/schemas/PublicSettings' }
+      required: [categories, settings]
+
+    SearchEngine:
+      type: object
+      properties:
+        name: { type: string, example: Google }
+        url_template:
+          type: string
+          description: 含 `{query}` 占位符
+          example: 'https://www.google.com/search?q={query}'
+      required: [name, url_template]
+
+    PublicSettings:
+      type: object
+      properties:
+        site_title: { type: string }
+        site_favicon: { type: string }
+        theme: { type: string, enum: [light, dark, auto] }
+        background: { type: object, additionalProperties: true }
+        search_engines:
+          type: array
+          items: { $ref: '#/components/schemas/SearchEngine' }
+        default_search_engine: { type: string }
+        open_in_new_tab_default: { type: boolean }
+        homepage_layout: { type: string, enum: [grid, list] }
+
+    AdminSettings:
+      allOf:
+        - $ref: '#/components/schemas/PublicSettings'
+        - type: object
+          properties:
+            allow_guest_access: { type: boolean }
+
+    OrderRequest:
+      type: object
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              sort_order: { type: integer }
+            required: [id, sort_order]
+      required: [items]
+
+    OrderResult:
+      type: object
+      properties:
+        ok: { type: boolean }
+        updated: { type: integer }
+      required: [ok]
+
+    MoveRequest:
+      type: object
+      properties:
+        category_id: { type: integer }
+        sort_order: { type: integer }
+      required: [category_id]
+
+    UploadResult:
+      type: object
+      properties:
+        filename: { type: string }
+        url: { type: string }
+        size: { type: integer }
+        mime: { type: string }
+      required: [filename, url]
+
+    IconRef:
+      type: object
+      properties:
+        icon_type: { type: string, enum: [url, upload, auto, none] }
+        icon_value: { type: string }
+      required: [icon_type, icon_value]
+
+    ExportBundle:
+      type: object
+      description: 导出/导入数据包。`format` 区分来源：`xiaowork-nav-v1`（本系统）/ `legacy-v1`（旧站）。
+      properties:
+        format: { type: string, example: xiaowork-nav-v1 }
+        schema_version: { type: integer, example: 1 }
+        exported_at: { type: string, format: date-time }
+        checksum: { type: string, description: 'sha256:<hex>' }
+        categories:
+          type: array
+          items: { $ref: '#/components/schemas/Category' }
+        bookmarks:
+          type: array
+          items: { $ref: '#/components/schemas/Bookmark' }
+        settings: { type: object, additionalProperties: true }
+      required: [format, schema_version]
+
+    ImportRequest:
+      allOf:
+        - $ref: '#/components/schemas/ExportBundle'
+        - type: object
+          properties:
+            conflict_strategy:
+              type: string
+              enum: [skip, overwrite, rename]
+              default: skip
+              description: 默认 skip，不覆盖已有数据
+
+    ImportPreview:
+      type: object
+      properties:
+        format: { type: string }
+        categories_new: { type: integer }
+        categories_conflict: { type: integer }
+        bookmarks_new: { type: integer }
+        bookmarks_conflict: { type: integer }
+        warnings:
+          type: array
+          items: { type: string }
+      required: [format]
+
+    ImportResult:
+      type: object
+      properties:
+        ok: { type: boolean }
+        categories_imported: { type: integer }
+        bookmarks_imported: { type: integer }
+        skipped: { type: integer }
+      required: [ok]
+
+    Backup:
+      type: object
+      properties:
+        id: { type: string }
+        created_at: { type: string, format: date-time }
+        app_version: { type: string }
+        schema_version: { type: integer }
+        size: { type: integer }
+      required: [id, created_at]
+
+    UpdateInfo:
+      type: object
+      properties:
+        current_version: { type: string }
+        latest_version: { type: string }
+        update_available: { type: boolean }
+        release_url: { type: string }
+        checked_at: { type: string, format: date-time }
+      required: [current_version, update_available]

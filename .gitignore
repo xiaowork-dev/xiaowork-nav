@@ -1,0 +1,42 @@
+# ---- Secrets / environment ----
+.env
+.env.*
+!.env.example
+deploy/.env
+!deploy/.env.example
+
+# ---- Runtime data (SQLite, uploads, backups) ----
+/data/
+backend/data/
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+
+# ---- Go ----
+/backend/bin/
+/backend/tmp/
+*.test
+coverage.out
+*.prof
+
+# ---- Node / frontend ----
+node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.tsbuildinfo
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# ---- Editor / OS ----
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# ---- Misc ----
+*.log
+/tmp/

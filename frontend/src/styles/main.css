@@ -1,0 +1,100 @@
+/* XiaoWork Nav — base theme.
+ *
+ * Visual direction follows the legacy reference: indigo/purple gradient
+ * background with glassmorphism surfaces. Colours are exposed as CSS
+ * variables so the theme system (P4) can switch them at runtime.
+ */
+
+:root {
+  --bg-start: #303a83;
+  --bg-mid: #464293;
+  --bg-end: #7752b0;
+  --bg-accent: #be6b99;
+
+  --glass: rgba(255, 255, 255, 0.14);
+  --glass-strong: rgba(255, 255, 255, 0.22);
+  --glass-border: rgba(255, 255, 255, 0.28);
+
+  --text-main: #ffffff;
+  --text-sub: rgba(255, 255, 255, 0.78);
+  --text-dim: rgba(255, 255, 255, 0.58);
+
+  --accent: #6d5dfc;
+  --accent-2: #22b8cf;
+  --danger: #df3f51;
+  --success: #19a463;
+
+  --radius-sm: 12px;
+  --radius: 16px;
+  --radius-lg: 22px;
+  --page-width: 1180px;
+  --tile-size: 58px;
+
+  --shadow-soft: 0 18px 50px rgba(16, 20, 62, 0.24);
+  --transition: 160ms ease;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--text-main);
+  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  background:
+    radial-gradient(circle at 84% 7%, rgba(255, 134, 187, 0.45), transparent 30%),
+    radial-gradient(circle at 74% 88%, rgba(113, 129, 255, 0.6), transparent 38%),
+    linear-gradient(126deg, var(--bg-start) 0%, var(--bg-mid) 33%, var(--bg-end) 63%, var(--bg-accent) 100%);
+  background-attachment: fixed;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.page {
+  width: min(100%, var(--page-width));
+  margin: 0 auto;
+  padding: 28px clamp(16px, 4vw, 42px) 48px;
+}
+
+.panel {
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: var(--glass);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+
+.muted {
+  color: var(--text-sub);
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+}
+
+.error-text {
+  color: #ffd9dd;
+}
