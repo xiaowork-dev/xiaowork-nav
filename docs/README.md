@@ -14,8 +14,15 @@
 | [api-spec.md](api-spec.md) | API 设计规范、端点清单、错误码 |
 | [api-contract-review.md](api-contract-review.md) | API 契约一致性检查 |
 | [database-design.md](database-design.md) | 数据库设计、迁移与备份策略 |
+| [legacy-data-migration-report.md](legacy-data-migration-report.md) | **旧站真实数据迁移报告（字段映射、导入结果、异常数据）** |
 | [deployment.md](deployment.md) | Docker 部署、更新与排障 |
 | [frontend-agent-guide.md](frontend-agent-guide.md) | 面向其他 AI Agent 的前端交接规范 |
+
+## 测试样本
+
+| 文件 | 内容 |
+| --- | --- |
+| [samples/legacy-data.sample.json](samples/legacy-data.sample.json) | 脱敏的旧站数据样本（供自动化测试；真实数据不入库） |
 
 ## 契约
 

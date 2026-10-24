@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 )
 
 func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
@@ -36,12 +37,16 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	strategy := "skip"
-	var probe struct {
-		ConflictStrategy string `json:"conflict_strategy"`
-	}
-	if err := json.Unmarshal(raw, &probe); err == nil && probe.ConflictStrategy != "" {
-		strategy = probe.ConflictStrategy
+	// The conflict strategy may arrive as a query parameter (required for
+	// top-level-array payloads) or inside an object body.
+	strategy := strings.TrimSpace(r.URL.Query().Get("conflict_strategy"))
+	if strategy == "" {
+		var probe struct {
+			ConflictStrategy string `json:"conflict_strategy"`
+		}
+		if err := json.Unmarshal(raw, &probe); err == nil && probe.ConflictStrategy != "" {
+			strategy = probe.ConflictStrategy
+		}
 	}
 
 	result, err := s.transfer.Import(r.Context(), raw, strategy)

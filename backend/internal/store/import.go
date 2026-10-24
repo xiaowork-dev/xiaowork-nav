@@ -59,7 +59,7 @@ func (s *Store) ImportData(ctx context.Context, cats []models.Category, bookmark
 				result.CategoriesImported++
 				catIDMap[c.ID] = existingID
 			case ImportRename:
-				newID, err := insertCategory(ctx, tx, name+" (导入)", c.Description, c.IsVisible, now)
+				newID, err := insertCategory(ctx, tx, name+" (导入)", c.Description, c.SortOrder, c.IsVisible, now)
 				if err != nil {
 					return result, err
 				}
@@ -71,7 +71,7 @@ func (s *Store) ImportData(ctx context.Context, cats []models.Category, bookmark
 			}
 			continue
 		}
-		newID, err := insertCategory(ctx, tx, name, c.Description, c.IsVisible, now)
+		newID, err := insertCategory(ctx, tx, name, c.Description, c.SortOrder, c.IsVisible, now)
 		if err != nil {
 			return result, err
 		}
@@ -82,18 +82,11 @@ func (s *Store) ImportData(ctx context.Context, cats []models.Category, bookmark
 	for _, b := range bookmarks {
 		targetCat, ok := catIDMap[b.CategoryID]
 		if !ok {
-			// Bookmark references a category that was not part of the bundle
-			// (or was skipped without an ID): fall back to its original ID if
-			// that category exists.
-			exists, err := categoryExistsTx(ctx, tx, b.CategoryID)
-			if err != nil {
-				return result, err
-			}
-			if !exists {
-				result.Skipped++
-				continue
-			}
-			targetCat = b.CategoryID
+			// The bookmark references a category that was not part of the
+			// bundle. Guessing an ID could attach it to an unrelated category,
+			// so skip it instead.
+			result.Skipped++
+			continue
 		}
 
 		existingID, err := bookmarkIDByURL(ctx, tx, targetCat, b.URL)
@@ -144,23 +137,39 @@ func (s *Store) ImportData(ctx context.Context, cats []models.Category, bookmark
 }
 
 // PreviewImport counts new vs conflicting entries without writing.
+//
+// Categories are matched by name; bookmarks are matched by URL inside the
+// category the bundle would resolve to (a brand-new category can never
+// conflict, because it has no existing rows yet).
 func (s *Store) PreviewImport(ctx context.Context, cats []models.Category, bookmarks []models.Bookmark) (int, int, int, int, error) {
 	existingCats, err := categoryNameIndex(ctx, s.db)
 	if err != nil {
 		return 0, 0, 0, 0, err
 	}
-	var catNew, catConflict int
+
+	catNew, catConflict := 0, 0
+	bundleToExisting := map[int64]int64{}
 	for _, c := range cats {
-		if _, found := existingCats[strings.ToLower(strings.TrimSpace(c.Name))]; found {
+		key := strings.ToLower(strings.TrimSpace(c.Name))
+		if key == "" {
+			continue
+		}
+		if id, found := existingCats[key]; found {
 			catConflict++
+			bundleToExisting[c.ID] = id
 		} else {
 			catNew++
 		}
 	}
 
-	var bmNew, bmConflict int
+	bmNew, bmConflict := 0, 0
 	for _, b := range bookmarks {
-		id, err := bookmarkIDByURL(ctx, s.db, b.CategoryID, b.URL)
+		targetID, known := bundleToExisting[b.CategoryID]
+		if !known {
+			bmNew++
+			continue
+		}
+		id, err := bookmarkIDByURL(ctx, s.db, targetID, b.URL)
 		if err != nil {
 			return 0, 0, 0, 0, err
 		}
@@ -199,24 +208,16 @@ func categoryNameIndex(ctx context.Context, q querier) (map[string]int64, error)
 	return out, rows.Err()
 }
 
-func insertCategory(ctx context.Context, tx *sql.Tx, name, description string, isVisible bool, now string) (int64, error) {
+func insertCategory(ctx context.Context, tx *sql.Tx, name, description string, sortOrder int, isVisible bool, now string) (int64, error) {
 	res, err := tx.ExecContext(ctx,
 		`INSERT INTO categories (name, description, sort_order, is_visible, created_at, updated_at)
-         VALUES (?, ?, 0, ?, ?, ?)`,
-		name, description, boolToInt(isVisible), now, now,
+         VALUES (?, ?, ?, ?, ?, ?)`,
+		name, description, sortOrder, boolToInt(isVisible), now, now,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("insert category %q: %w", name, err)
 	}
 	return res.LastInsertId()
-}
-
-func categoryExistsTx(ctx context.Context, tx *sql.Tx, id int64) (bool, error) {
-	var n int
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM categories WHERE id = ?`, id).Scan(&n); err != nil {
-		return false, fmt.Errorf("category exists: %w", err)
-	}
-	return n > 0, nil
 }
 
 func bookmarkIDByURL(ctx context.Context, q querier, categoryID int64, url string) (int64, error) {

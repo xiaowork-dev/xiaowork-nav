@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -206,6 +207,81 @@ func (i *IconService) Open(ctx context.Context, filename string) (io.ReadSeekClo
 		return nil, "", NotFound("文件不存在")
 	}
 	return f, upload.Mime, nil
+}
+
+// SaveDataURI decodes a `data:` URI image (percent-encoded or base64) and
+// stores it as an uploaded icon. This preserves legacy icons that were embedded
+// directly in the source data instead of being hosted at a URL.
+func (i *IconService) SaveDataURI(ctx context.Context, dataURI string) (*models.Upload, error) {
+	data, mediaType, err := decodeDataURI(dataURI)
+	if err != nil {
+		return nil, err
+	}
+	ext := extensionForMediaType(mediaType)
+	if ext == "" {
+		return nil, fmt.Errorf("unsupported data URI media type %q", mediaType)
+	}
+	return i.SaveUpload(ctx, data, "icon"+ext)
+}
+
+// IsDataURI reports whether a value is a data: URI.
+func IsDataURI(value string) bool {
+	return strings.HasPrefix(strings.TrimSpace(value), "data:")
+}
+
+func decodeDataURI(dataURI string) ([]byte, string, error) {
+	trimmed := strings.TrimSpace(dataURI)
+	if !strings.HasPrefix(trimmed, "data:") {
+		return nil, "", fmt.Errorf("not a data URI")
+	}
+	rest := trimmed[len("data:"):]
+	comma := strings.Index(rest, ",")
+	if comma < 0 {
+		return nil, "", fmt.Errorf("malformed data URI")
+	}
+	meta := rest[:comma]
+	payload := rest[comma+1:]
+
+	mediaType := strings.TrimSpace(strings.Split(meta, ";")[0])
+	if mediaType == "" {
+		mediaType = "text/plain"
+	}
+
+	if strings.Contains(strings.ToLower(meta), ";base64") {
+		decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(payload))
+		if err != nil {
+			decoded, err = base64.RawStdEncoding.DecodeString(strings.TrimSpace(payload))
+		}
+		if err != nil {
+			return nil, "", fmt.Errorf("decode base64 data URI: %w", err)
+		}
+		return decoded, mediaType, nil
+	}
+
+	decoded, err := url.PathUnescape(payload)
+	if err != nil {
+		return nil, "", fmt.Errorf("decode data URI: %w", err)
+	}
+	return []byte(decoded), mediaType, nil
+}
+
+func extensionForMediaType(mediaType string) string {
+	switch strings.ToLower(strings.TrimSpace(mediaType)) {
+	case "image/svg+xml":
+		return ".svg"
+	case "image/png":
+		return ".png"
+	case "image/jpeg", "image/jpg":
+		return ".jpg"
+	case "image/webp":
+		return ".webp"
+	case "image/gif":
+		return ".gif"
+	case "image/x-icon", "image/vnd.microsoft.icon":
+		return ".ico"
+	default:
+		return ""
+	}
 }
 
 func detectImageType(data []byte, name string) (mime, ext string, ok bool) {

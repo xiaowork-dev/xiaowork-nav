@@ -135,12 +135,16 @@ type ExportBundle struct {
 
 // ImportPreview summarises what an import would change without writing.
 type ImportPreview struct {
-	Format              string   `json:"format"`
-	CategoriesNew       int      `json:"categories_new"`
-	CategoriesConflict  int      `json:"categories_conflict"`
-	BookmarksNew        int      `json:"bookmarks_new"`
-	BookmarksConflict   int      `json:"bookmarks_conflict"`
-	Warnings            []string `json:"warnings,omitempty"`
+	Format             string   `json:"format"`
+	CategoriesNew      int      `json:"categories_new"`
+	CategoriesConflict int      `json:"categories_conflict"`
+	BookmarksNew       int      `json:"bookmarks_new"`
+	BookmarksConflict  int      `json:"bookmarks_conflict"`
+	BookmarksInvalid   int      `json:"bookmarks_invalid"`
+	IconsKept          int      `json:"icons_kept"`
+	IconsConverted     int      `json:"icons_converted"`
+	IconsDropped       int      `json:"icons_dropped"`
+	Warnings           []string `json:"warnings,omitempty"`
 }
 
 // ImportResult reports the outcome of an applied import.

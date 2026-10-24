@@ -155,6 +155,10 @@ export interface ImportPreview {
   categories_conflict: number
   bookmarks_new: number
   bookmarks_conflict: number
+  bookmarks_invalid?: number
+  icons_kept?: number
+  icons_converted?: number
+  icons_dropped?: number
   warnings?: string[]
 }
 

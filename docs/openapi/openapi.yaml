@@ -653,13 +653,29 @@ paths:
       tags: [admin]
       operationId: runImport
       summary: 执行导入（单事务；默认不覆盖已有数据）
+      description: |
+        请求体可以是本系统导出的数据包对象，也可以是旧站分类数组
+        （`[ { "category": ..., "items": [...] } ]`）。
+        冲突策略优先从 `conflict_strategy` 查询参数读取（数组请求体必须使用查询参数），
+        对象请求体也兼容从 body 读取。
       parameters:
         - $ref: '#/components/parameters/CsrfHeader'
+        - name: conflict_strategy
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [skip, overwrite, rename]
+            default: skip
+          description: 冲突处理策略；默认 skip（不覆盖已有数据）
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ImportRequest' }
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/ImportRequest'
+                - $ref: '#/components/schemas/LegacyCategoryArray'
       responses:
         '200':
           description: 导入结果
@@ -1116,10 +1132,38 @@ components:
         categories_conflict: { type: integer }
         bookmarks_new: { type: integer }
         bookmarks_conflict: { type: integer }
+        bookmarks_invalid:
+          type: integer
+          description: 网址不合法的条目数（导入时会被跳过）
+        icons_kept:
+          type: integer
+          description: 原样保留的外部图标地址数量（icon_type=url）
+        icons_converted:
+          type: integer
+          description: 由内嵌 data URI 转换为本地上传的图标数量（icon_type=upload）
+        icons_dropped:
+          type: integer
+          description: 图标值无效、已设为无图标的数量
         warnings:
           type: array
           items: { type: string }
       required: [format]
+
+    LegacyCategoryArray:
+      type: array
+      description: 旧站分类数组（`category`/`icon`/`items`，条目含 `name`/`url`/`desc`/`logo` 等）
+      items:
+        type: object
+        properties:
+          category: { type: string }
+          name: { type: string }
+          icon: { type: string }
+          items:
+            type: array
+            items:
+              type: object
+              additionalProperties: true
+        additionalProperties: true
 
     ImportResult:
       type: object

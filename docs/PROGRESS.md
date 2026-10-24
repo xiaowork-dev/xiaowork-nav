@@ -28,6 +28,7 @@
 | 公开/私有权限区分 | 已完成 | 浏览器实测（私有站点不公开；未登录 401/跳转） | [P3 报告](deliveries/P3-delivery.md) |
 | 数据导入导出与备份 | 已完成 | 浏览器实测（导出下载、导入 legacy 预览与执行、备份创建） | [P3 报告](deliveries/P3-delivery.md) |
 | 前端类型检查与构建 | 已完成 | `npm run build` 通过 | [P3 报告](deliveries/P3-delivery.md) |
+| 旧站真实数据迁移（测试库） | 已完成 | 预览/导入 API + 浏览器渲染验证；10 分类 / 110 站点 / 顺序与图标保留 | [迁移报告](legacy-data-migration-report.md) |
 | Docker 部署工件（P1） | 部分完成 | `docker compose config` 通过；**镜像构建未执行** | [P1 报告](deliveries/P1-delivery.md) |
 
 ## 正在进行 / 未完成
@@ -38,7 +39,7 @@
 | 移动端与跨浏览器验证 | 未验证 | P4（需设备模拟或真机） |
 | Docker 镜像构建实测 | 未执行 | P5 |
 | GitHub 远程仓库与推送 | 未创建 | 确认仓库名后配置 |
-| 旧站真实数据导入验证 | 待样本 | 取得 `data.json` 后补充 |
+| 旧站真实数据正式导入 | 待确认 | 测试库已验证；等待用户确认第 12 节 6 项后再正式导入 |
 | OpenAPI 规范级 lint / 前端类型自动生成 | 未接入 | P5 接入 CI |
 
 ## 当前阻塞与风险

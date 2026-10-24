@@ -40,3 +40,10 @@ desktop.ini
 # ---- Misc ----
 *.log
 /tmp/
+
+# ---- Legacy / real user data (must never be committed) ----
+# The real navigation export is imported locally only; use
+# docs/samples/legacy-data.sample.json for tests.
+data.json
+legacy-data.json
+*.private.json

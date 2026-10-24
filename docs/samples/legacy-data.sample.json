@@ -1,0 +1,70 @@
+[
+  {
+    "category": "Sample 常用",
+    "icon": "✨",
+    "items": [
+      {
+        "name": "Example Site",
+        "url": "https://example.com/",
+        "desc": "示例站点（无图标）",
+        "si": "example"
+      },
+      {
+        "name": "Embedded SVG Icon",
+        "url": "https://example.org/",
+        "desc": "内嵌 SVG data URI 图标",
+        "logo": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%2210%22%20fill%3D%22%23ffffff%22%2F%3E%3C%2Fsvg%3E",
+        "logoType": "svg"
+      },
+      {
+        "name": "Embedded Base64 PNG",
+        "url": "https://example.net/",
+        "desc": "base64 data URI 图标",
+        "logo": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+      },
+      {
+        "name": "Remote SVG Icon",
+        "url": "https://icons.example.com/",
+        "desc": "外部 SVG 图标地址（原样保留）",
+        "logo": "https://icons.example.com/logo.svg",
+        "logoType": "svg"
+      },
+      {
+        "name": "Text Glyph Icon",
+        "url": "https://text-icon.example.com/",
+        "desc": "文本型图标",
+        "logo": "延迟"
+      },
+      {
+        "name": "Favicon Type",
+        "url": "https://favicon.example.com/",
+        "desc": "iconType=favicon（不自动替换）",
+        "iconType": "favicon",
+        "color": "#2D72D9",
+        "tag": "Info"
+      }
+    ]
+  },
+  {
+    "category": "Sample 域名 ",
+    "icon": "🔗",
+    "items": [
+      {
+        "name": "Duplicate URL Site",
+        "url": "https://example.com/",
+        "desc": "与第一个分类重复的网址"
+      },
+      {
+        "name": "Remote WebP Icon",
+        "url": "https://webp.example.com/",
+        "desc": "外部 WebP 图标",
+        "logo": "https://webp.example.com/icon.webp"
+      },
+      {
+        "name": "Invalid URL Site",
+        "url": "javascript:alert(1)",
+        "desc": "非法协议（导入时应跳过）"
+      }
+    ]
+  }
+]

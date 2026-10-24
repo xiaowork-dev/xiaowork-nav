@@ -37,9 +37,15 @@ export function previewImport(bundle: unknown): Promise<ImportPreview> {
   return api.post<ImportPreview>('/api/v1/admin/import/preview', bundle)
 }
 
+/**
+ * Runs an import. The payload may be a native export object or a legacy
+ * category array, so the conflict strategy is always sent as a query
+ * parameter (it cannot be merged into an array body).
+ */
 export function runImport(bundle: unknown, strategy: string): Promise<ImportResult> {
-  const payload = { ...(bundle as Record<string, unknown>), conflict_strategy: strategy }
-  return api.post<ImportResult>('/api/v1/admin/import', payload)
+  return api.post<ImportResult>('/api/v1/admin/import', bundle, {
+    query: { conflict_strategy: strategy },
+  })
 }
 
 export function listBackups(): Promise<{ items: Backup[] }> {
