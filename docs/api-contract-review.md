@@ -47,6 +47,8 @@
 
 ## 3. 本次修订内容
 
+### P1 修订
+
 | 修订 | 原因 |
 | --- | --- |
 | 单资源更新由 `PUT` 改为 `PATCH` | 明确"部分字段更新"语义，避免 PUT 全量覆盖歧义 |
@@ -57,6 +59,12 @@
 | 增加 `operationId` | 便于 SDK/类型生成与测试命名 |
 | 增加 `NavigationResponse`、`HealthResponse`、`UploadResult`、`IconRef` | 覆盖首页聚合、健康检查与图标流程 |
 | 明确 `is_visible = false` 即"私有，仅管理员可见" | 落实访客访问策略 |
+
+### P2 修订
+
+| 修订 | 原因 |
+| --- | --- |
+| 新增 `GET /api/v1/public/uploads/{filename}` | 上传图标（`icon_type=upload`）需要公开读取路径，否则前端无法显示本地图标 |
 
 ---
 

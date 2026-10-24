@@ -66,15 +66,13 @@ xiaowork-nav/
 │   ├── cmd/server/main.go
 │   ├── internal/
 │   │   ├── api/                 # 路由、handler、DTO、中间件
-│   │   ├── auth/                # 认证、会话、密码
+│   │   ├── auth/                # 密码哈希、会话标识、登录限流
 │   │   ├── config/
 │   │   ├── store/               # 存储层（仓储接口 + SQLite 实现）
-│   │   ├── service/             # 领域服务（业务规则）
-│   │   ├── models/              # 领域模型
+│   │   ├── service/             # 领域服务（认证、目录、设置、图标、导入导出、备份）
+│   │   ├── models/              # 领域模型（与契约字段对齐）
+│   │   ├── security/            # URL 校验与 SSRF 防护
 │   │   ├── migrations/          # 版本化 SQL（embed）
-│   │   ├── icons/               # 图标上传与抓取（防 SSRF）
-│   │   ├── importexport/        # 导入导出
-│   │   ├── backup/              # 备份恢复
 │   │   ├── static/              # 前端产物 embed + SPA fallback
 │   │   └── version/
 │   ├── go.mod
@@ -119,9 +117,11 @@ xiaowork-nav/
 | `internal/store` | 持久化、SQL、迁移 | models、migrations | service、api |
 | `internal/auth` | 密码哈希、会话、Cookie、CSRF | store 接口、models | api |
 | `internal/config` | 环境变量/配置 | — | 其他业务模块 |
-| `internal/icons` | 图标上传与抓取（SSRF 防护） | store、config | api |
-| `internal/importexport` | 导入导出、旧站转换 | service、store、models | api |
-| `internal/backup` | 在线备份、快照、恢复 | store、config | api |
+| `internal/models` | 领域模型（与契约字段对齐） | — | 其他业务模块 |
+| `internal/auth` | 密码哈希（Argon2id）、会话标识、登录限流 | — | api、store |
+| `internal/security` | URL 协议校验、SSRF 防护的 HTTP 客户端 | — | api、store |
+| `internal/service` | 业务规则：认证、目录（分类/导航项/搜索）、设置、图标、导入导出、备份 | store、models、auth、security、config | api |
+| `internal/icons` / `internal/importexport` / `internal/backup` | **实现上归入 `internal/service`**（图标、导入导出、备份） | store、models、security | api |
 | `internal/static` | 托管前端产物、SPA fallback | embed 资源 | 业务模块 |
 
 **关键约束：**

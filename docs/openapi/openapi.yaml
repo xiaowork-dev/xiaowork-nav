@@ -265,6 +265,30 @@ paths:
               schema: { $ref: '#/components/schemas/PublicSettings' }
         default: { $ref: '#/components/responses/Error' }
 
+  /public/uploads/{filename}:
+    get:
+      tags: [public]
+      operationId: getPublicUpload
+      summary: 获取上传的图标文件（用于 icon_type=upload）
+      security: []
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 图标文件
+          content:
+            image/png: { schema: { type: string, format: binary } }
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+            image/gif: { schema: { type: string, format: binary } }
+            image/x-icon: { schema: { type: string, format: binary } }
+            image/svg+xml: { schema: { type: string, format: binary } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        default: { $ref: '#/components/responses/Error' }
+
   /admin/categories:
     get:
       tags: [admin]

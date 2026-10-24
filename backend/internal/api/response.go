@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+
+	"github.com/xiaowork-dev/xiaowork-nav/backend/internal/service"
 )
 
 // Stable, machine-readable error codes. See docs/api-spec.md appendix A.
@@ -93,6 +95,16 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 	var typed *APIError
 	if errors.As(err, &typed) {
 		apiErr = typed
+	} else {
+		var svc *service.Error
+		if errors.As(err, &svc) {
+			apiErr = &APIError{
+				Status:  statusForKind(svc.Kind),
+				Code:    svc.Code,
+				Message: svc.Message,
+				Details: toFieldDetails(svc.Details),
+			}
+		}
 	}
 
 	writeJSON(w, r, apiErr.Status, errorEnvelope{Error: errorBody{
@@ -101,6 +113,40 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		Details:   apiErr.Details,
 		RequestID: requestIDFrom(r.Context()),
 	}})
+}
+
+func statusForKind(kind service.Kind) int {
+	switch kind {
+	case service.KindValidation:
+		return http.StatusBadRequest
+	case service.KindNotFound:
+		return http.StatusNotFound
+	case service.KindConflict:
+		return http.StatusConflict
+	case service.KindUnauthorized:
+		return http.StatusUnauthorized
+	case service.KindForbidden:
+		return http.StatusForbidden
+	case service.KindUnsupported:
+		return http.StatusUnprocessableEntity
+	case service.KindTooLarge:
+		return http.StatusRequestEntityTooLarge
+	case service.KindRateLimited:
+		return http.StatusTooManyRequests
+	default:
+		return http.StatusInternalServerError
+	}
+}
+
+func toFieldDetails(details []service.FieldError) []errorField {
+	if len(details) == 0 {
+		return nil
+	}
+	out := make([]errorField, 0, len(details))
+	for _, d := range details {
+		out = append(out, errorField{Field: d.Field, Issue: d.Issue})
+	}
+	return out
 }
 
 // notFound is the JSON 404 handler for unmatched API routes.

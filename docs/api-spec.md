@@ -148,6 +148,7 @@
 | GET | `/api/v1/public/categories/{id}/bookmarks` | 某分类下可见导航项 |
 | GET | `/api/v1/public/search?q=` | 搜索可见导航项 |
 | GET | `/api/v1/public/settings` | 公开站点设置（标题、Favicon、主题、搜索引擎等） |
+| GET | `/api/v1/public/uploads/{filename}` | 获取上传的图标文件（`icon_type=upload`） |
 | GET | `/api/v1/version` | 当前版本与构建信息 |
 
 ### 6.2 管理接口

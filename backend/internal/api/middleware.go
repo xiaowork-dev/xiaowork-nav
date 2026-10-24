@@ -9,6 +9,8 @@ import (
 	"runtime/debug"
 	"strings"
 	"time"
+
+	"github.com/xiaowork-dev/xiaowork-nav/backend/internal/service"
 )
 
 type ctxKey string
@@ -131,7 +133,12 @@ func withSecurityHeaders(next http.Handler) http.Handler {
 func withBodyLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			r.Body = http.MaxBytesReader(w, r.Body, MaxBodyBytes)
+			limit := int64(MaxBodyBytes)
+			if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+				// Icon uploads: 1 MiB payload plus multipart framing overhead.
+				limit = int64(service.MaxIconBytes) + (64 << 10)
+			}
+			r.Body = http.MaxBytesReader(w, r.Body, limit)
 		}
 		next.ServeHTTP(w, r)
 	})

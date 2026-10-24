@@ -46,6 +46,13 @@ type Config struct {
 	SessionCookieName string
 	// SessionTTLHours is the session lifetime in hours.
 	SessionTTLHours int
+	// SecureCookie marks the session cookie Secure (HTTPS only).
+	SecureCookie bool
+	// UpdateRepo is the "owner/name" GitHub repository used for update checks
+	// (empty disables remote version checks).
+	UpdateRepo string
+	// BackupKeep is the number of snapshots to retain (0 = unlimited).
+	BackupKeep int
 }
 
 // Load reads configuration from the environment, applying defaults.
@@ -65,6 +72,9 @@ func Load() (*Config, error) {
 		AllowedOrigins:    getEnvList("XN_ALLOWED_ORIGINS"),
 		SessionCookieName: getEnv("XN_SESSION_COOKIE", "xiaowork_session"),
 		SessionTTLHours:   getEnvInt("XN_SESSION_TTL_HOURS", 168),
+		SecureCookie:      getEnvBool("XN_SECURE_COOKIE", true),
+		UpdateRepo:        getEnv("XN_UPDATE_REPO", ""),
+		BackupKeep:        getEnvInt("XN_BACKUP_KEEP", 5),
 	}
 
 	if cfg.Port < 1 || cfg.Port > 65535 {

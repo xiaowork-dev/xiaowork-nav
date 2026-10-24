@@ -77,12 +77,21 @@ func run() int {
 		"schema_version", current,
 	)
 
-	handler := api.New(api.Deps{
+	app := api.New(api.Deps{
 		Config: cfg,
 		DB:     db,
 		Logger: logger,
 		Static: static.Handler(),
-	}).Handler()
+	})
+	handler := app.Handler()
+
+	if !cfg.SecureCookie {
+		logger.Warn("session cookie is not marked Secure (XN_SECURE_COOKIE=false); enable it in production")
+	}
+
+	maintenanceCtx, stopMaintenance := context.WithCancel(context.Background())
+	defer stopMaintenance()
+	go app.RunMaintenance(maintenanceCtx, time.Hour)
 
 	srv := &http.Server{
 		Addr:              cfg.Addr(),

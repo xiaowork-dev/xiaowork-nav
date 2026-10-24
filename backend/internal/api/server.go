@@ -1,7 +1,7 @@
 // Package api wires HTTP routing, middleware, and handlers.
 //
-// Handlers translate HTTP requests into domain operations; they must only
-// expose the fields defined in docs/openapi/openapi.yaml.
+// Handlers translate HTTP requests into service calls; they must only expose
+// the fields defined in docs/openapi/openapi.yaml.
 package api
 
 import (
@@ -11,6 +11,8 @@ import (
 
 	"github.com/xiaowork-dev/xiaowork-nav/backend/internal/config"
 	"github.com/xiaowork-dev/xiaowork-nav/backend/internal/migrations"
+	"github.com/xiaowork-dev/xiaowork-nav/backend/internal/service"
+	"github.com/xiaowork-dev/xiaowork-nav/backend/internal/store"
 	"github.com/xiaowork-dev/xiaowork-nav/backend/internal/version"
 )
 
@@ -25,19 +27,35 @@ type Deps struct {
 
 // Server holds shared handler dependencies.
 type Server struct {
-	cfg    *config.Config
-	db     *sql.DB
-	log    *slog.Logger
-	static http.Handler
+	cfg      *config.Config
+	db       *sql.DB
+	log      *slog.Logger
+	static   http.Handler
+	store    *store.Store
+	auth     *service.AuthService
+	settings *service.SettingsService
+	catalog  *service.CatalogService
+	icons    *service.IconService
+	transfer *service.TransferService
+	backup   *service.BackupService
 }
 
-// New builds a Server.
+// New builds a Server and its services.
 func New(deps Deps) *Server {
+	st := store.New(deps.DB)
+	settings := service.NewSettingsService(st)
 	return &Server{
-		cfg:    deps.Config,
-		db:     deps.DB,
-		log:    deps.Logger,
-		static: deps.Static,
+		cfg:      deps.Config,
+		db:       deps.DB,
+		log:      deps.Logger,
+		static:   deps.Static,
+		store:    st,
+		auth:     service.NewAuthService(st, deps.Config),
+		settings: settings,
+		catalog:  service.NewCatalogService(st, settings),
+		icons:    service.NewIconService(st, deps.Config.UploadsDir),
+		transfer: service.NewTransferService(st),
+		backup:   service.NewBackupService(deps.DB, deps.Config.BackupsDir, deps.Config.UploadsDir, version.Version, deps.Config.BackupKeep),
 	}
 }
 
@@ -45,9 +63,55 @@ func New(deps Deps) *Server {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
+	// System
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("GET /api/v1/version", s.handleVersion)
-	mux.HandleFunc("GET /api/v1/auth/status", s.handleAuthStatus)
+
+	// Auth
+	mux.HandleFunc("GET /api/v1/auth/status", s.optionalAuth(s.handleAuthStatus))
+	mux.HandleFunc("POST /api/v1/setup", s.handleSetup)
+	mux.HandleFunc("POST /api/v1/auth/login", s.handleLogin)
+	mux.HandleFunc("POST /api/v1/auth/logout", s.requireAuth(s.handleLogout))
+	mux.HandleFunc("GET /api/v1/auth/me", s.requireAuth(s.handleMe))
+	mux.HandleFunc("PUT /api/v1/auth/password", s.requireAuth(s.handleChangePassword))
+
+	// Public
+	mux.HandleFunc("GET /api/v1/public/navigation", s.publicRead(s.handlePublicNavigation))
+	mux.HandleFunc("GET /api/v1/public/categories", s.publicRead(s.handlePublicCategories))
+	mux.HandleFunc("GET /api/v1/public/categories/{id}/bookmarks", s.publicRead(s.handlePublicCategoryBookmarks))
+	mux.HandleFunc("GET /api/v1/public/search", s.publicRead(s.handlePublicSearch))
+	mux.HandleFunc("GET /api/v1/public/settings", s.publicRead(s.handlePublicSettings))
+	mux.HandleFunc("GET /api/v1/public/uploads/{filename}", s.handlePublicUpload)
+
+	// Admin: categories
+	mux.HandleFunc("GET /api/v1/admin/categories", s.requireAuth(s.handleListCategories))
+	mux.HandleFunc("POST /api/v1/admin/categories", s.requireAuth(s.handleCreateCategory))
+	mux.HandleFunc("PUT /api/v1/admin/categories/order", s.requireAuth(s.handleReorderCategories))
+	mux.HandleFunc("GET /api/v1/admin/categories/{id}", s.requireAuth(s.handleGetCategory))
+	mux.HandleFunc("PATCH /api/v1/admin/categories/{id}", s.requireAuth(s.handleUpdateCategory))
+	mux.HandleFunc("DELETE /api/v1/admin/categories/{id}", s.requireAuth(s.handleDeleteCategory))
+
+	// Admin: bookmarks
+	mux.HandleFunc("GET /api/v1/admin/bookmarks", s.requireAuth(s.handleListBookmarks))
+	mux.HandleFunc("POST /api/v1/admin/bookmarks", s.requireAuth(s.handleCreateBookmark))
+	mux.HandleFunc("PUT /api/v1/admin/bookmarks/order", s.requireAuth(s.handleReorderBookmarks))
+	mux.HandleFunc("GET /api/v1/admin/bookmarks/{id}", s.requireAuth(s.handleGetBookmark))
+	mux.HandleFunc("PATCH /api/v1/admin/bookmarks/{id}", s.requireAuth(s.handleUpdateBookmark))
+	mux.HandleFunc("DELETE /api/v1/admin/bookmarks/{id}", s.requireAuth(s.handleDeleteBookmark))
+	mux.HandleFunc("POST /api/v1/admin/bookmarks/{id}/move", s.requireAuth(s.handleMoveBookmark))
+
+	// Admin: settings, icons, transfer, backups
+	mux.HandleFunc("GET /api/v1/admin/settings", s.requireAuth(s.handleGetSettings))
+	mux.HandleFunc("PUT /api/v1/admin/settings", s.requireAuth(s.handleUpdateSettings))
+	mux.HandleFunc("POST /api/v1/admin/uploads/icon", s.requireAuth(s.handleUploadIcon))
+	mux.HandleFunc("POST /api/v1/admin/icons/fetch", s.requireAuth(s.handleFetchIcon))
+	mux.HandleFunc("GET /api/v1/admin/export", s.requireAuth(s.handleExport))
+	mux.HandleFunc("POST /api/v1/admin/import/preview", s.requireAuth(s.handleImportPreview))
+	mux.HandleFunc("POST /api/v1/admin/import", s.requireAuth(s.handleImport))
+	mux.HandleFunc("GET /api/v1/admin/backups", s.requireAuth(s.handleListBackups))
+	mux.HandleFunc("POST /api/v1/admin/backups", s.requireAuth(s.handleCreateBackup))
+	mux.HandleFunc("POST /api/v1/admin/backups/{id}/restore", s.requireAuth(s.handleRestoreBackup))
+	mux.HandleFunc("GET /api/v1/admin/update-check", s.requireAuth(s.handleUpdateCheck))
 
 	// Unmatched API routes return a JSON 404 rather than the SPA shell.
 	mux.HandleFunc("/api/", notFound)
@@ -63,6 +127,7 @@ func (s *Server) Handler() http.Handler {
 		withRequestID,
 		withLogging(s.log),
 		withSecurityHeaders,
+		s.withOriginCheck,
 		withCORS(s.cfg.AllowedOrigins),
 		withBodyLimit,
 	)
@@ -96,26 +161,6 @@ func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) {
 		Commit:        version.Commit,
 		BuildTime:     version.BuildTime,
 		SchemaVersion: schemaVersion,
-	})
-}
-
-type authStatus struct {
-	Initialized   bool `json:"initialized"`
-	Authenticated bool `json:"authenticated"`
-}
-
-func (s *Server) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
-	var count int
-	if err := s.db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&count); err != nil {
-		s.log.Error("count users", "error", err)
-		writeError(w, r, NewAPIError(http.StatusInternalServerError, CodeInternalError, "无法读取用户信息"))
-		return
-	}
-	// Session-based authentication is implemented in the auth milestone;
-	// until then no request is considered authenticated.
-	writeJSON(w, r, http.StatusOK, authStatus{
-		Initialized:   count > 0,
-		Authenticated: false,
 	})
 }
 

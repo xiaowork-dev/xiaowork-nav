@@ -86,6 +86,9 @@ cp .env.example .env
 | `XN_PROXY_NETWORK` | 空 | NPM 模式的外部网络名 |
 | `XN_LOG_LEVEL` | `info` | 日志级别 |
 | `XN_ALLOW_GUEST_ACCESS` | `true` | 是否允许游客浏览公开导航 |
+| `XN_SECURE_COOKIE` | `true` | 会话 Cookie 是否标记 Secure（生产保持 true；本地 HTTP 调试设为 false） |
+| `XN_BACKUP_KEEP` | `5` | 保留的备份快照数量（0 = 不限制） |
+| `XN_UPDATE_REPO` | 空 | 用于更新检查的 GitHub 仓库 `owner/name`（空则关闭远程检查） |
 | `XN_TRUSTED_PROXIES` | 空 | 受信任代理 CIDR（逗号分隔） |
 | `XN_ALLOWED_ORIGINS` | 空 | 允许的 CORS 来源（仅开发用） |
 | `XN_SESSION_TTL_HOURS` | `168` | 会话有效期（小时） |
