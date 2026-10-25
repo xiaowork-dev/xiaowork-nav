@@ -138,9 +138,11 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE }}
+          # Keep the "v" prefix so the image tag, the git tag and every document
+          # in this repository refer to exactly the same identifier (v2.0.0).
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
             type=raw,value=latest,enable=${{ !contains(github.event.inputs.tag || github.ref_name, '-') }}
 
       - name: Create the manifest list
@@ -160,7 +162,6 @@ jobs:
             cat /tmp/inspect.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-
   release:
     name: Create GitHub Release
     needs: merge
