@@ -13,6 +13,9 @@ import { useSiteStore } from '@/stores/site'
  * The page only orchestrates: it loads the shared navigation data and renders
  * the selected layout. Both layouts read the same store and the same API, so
  * switching never duplicates or diverges the data, and the theme is untouched.
+ *
+ * The scroll layout uses a full-bleed shell (`page--rail`) so its category rail
+ * can sit on the real page edge; the tabs layout keeps the centred container.
  */
 const site = useSiteStore()
 const { current } = useLayout()
@@ -25,7 +28,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="page" :class="{ 'page--tabs': isTabs }">
+  <div class="page" :class="isTabs ? 'page--tabs' : 'page--rail'">
     <AppHeader show-layout-switcher />
 
     <div v-if="site.loading" class="empty">

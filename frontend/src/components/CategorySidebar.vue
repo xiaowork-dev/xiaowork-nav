@@ -3,10 +3,11 @@ import { nextTick, ref, watch } from 'vue'
 import type { Category } from '@/types/api'
 
 /**
- * Fixed category rail for the scroll layout (PC).
+ * Category rail for the scroll layout.
  *
- * It only mirrors `site.categories` — no data of its own — and reports clicks
- * upwards so the layout owns the scrolling behaviour.
+ * It is a real column of the page shell: it sits on the page's left edge,
+ * spans from below the header to the bottom of the viewport, and only ever
+ * mirrors `site.categories` — the layout owns the scrolling behaviour.
  */
 const props = defineProps<{
   categories: Category[]
@@ -38,37 +39,40 @@ function count(category: Category): number {
 </script>
 
 <template>
-  <aside class="sidebar" :class="{ 'sidebar--collapsed': collapsed }" aria-label="分类导航">
-    <div class="sidebar__head">
-      <span v-if="!collapsed" class="sidebar__title">分类</span>
+  <aside class="rail" :class="{ 'rail--collapsed': collapsed }" aria-label="分类导航">
+    <div class="rail__head">
+      <span v-if="!collapsed" class="rail__title">分类</span>
       <button
         type="button"
-        class="btn btn--sm btn--ghost sidebar__toggle"
+        class="rail__toggle"
         :title="collapsed ? '展开分类栏' : '折叠分类栏'"
         :aria-expanded="!collapsed"
         @click="emit('toggle')"
       >
-        {{ collapsed ? '»' : '«' }}
+        <span aria-hidden="true">{{ collapsed ? '»' : '«' }}</span>
+        <span class="sr-only">{{ collapsed ? '展开分类栏' : '折叠分类栏' }}</span>
       </button>
     </div>
 
-    <nav ref="listEl" class="sidebar__list">
+    <nav ref="listEl" class="rail__list">
       <button
         v-for="category in categories"
         :key="category.id"
         type="button"
-        class="sidebar__item"
+        class="rail__item"
         :class="{ 'is-active': category.id === activeId }"
         :data-id="category.id"
         :title="category.name"
         :aria-current="category.id === activeId ? 'true' : undefined"
         @click="emit('select', category.id)"
       >
-        <span class="sidebar__icon" :style="category.color ? { color: category.color } : undefined">
+        <span class="rail__icon" :style="category.color ? { color: category.color } : undefined">
           {{ category.icon || category.name.slice(0, 1) }}
         </span>
-        <span v-if="!collapsed" class="sidebar__label">{{ category.name }}</span>
-        <span v-if="!collapsed" class="sidebar__count">{{ count(category) }}</span>
+        <template v-if="!collapsed">
+          <span class="rail__label">{{ category.name }}</span>
+          <span class="rail__count">{{ count(category) }}</span>
+        </template>
       </button>
     </nav>
   </aside>

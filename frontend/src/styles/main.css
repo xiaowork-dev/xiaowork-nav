@@ -43,6 +43,17 @@
 
   --shadow-soft: 0 18px 48px rgba(10, 12, 44, 0.32);
   --shadow-card: 0 10px 26px rgba(10, 12, 44, 0.24);
+
+  /* Category rail: a low-saturation, dark translucent purple-black column that
+     reads as page chrome rather than a floating card. */
+  --rail-bg: rgba(19, 15, 42, 0.62);
+  --rail-border: rgba(255, 255, 255, 0.07);
+  --rail-text: rgba(255, 255, 255, 0.74);
+  --rail-text-active: #ffffff;
+  --rail-text-dim: rgba(255, 255, 255, 0.42);
+  --rail-hover: rgba(255, 255, 255, 0.06);
+  --rail-active: rgba(124, 108, 255, 0.20);
+  --rail-chip: rgba(255, 255, 255, 0.07);
 }
 
 :root[data-theme='light'] {
@@ -76,6 +87,18 @@
 
   --shadow-soft: 0 16px 40px rgba(74, 70, 148, 0.14);
   --shadow-card: 0 8px 22px rgba(74, 70, 148, 0.1);
+
+  /* The rail stays a dark purple-black column in the light theme too, so the
+     page shell keeps the same identity; it is slightly more opaque to hold its
+     contrast against the light gradient. */
+  --rail-bg: rgba(26, 21, 58, 0.90);
+  --rail-border: rgba(255, 255, 255, 0.08);
+  --rail-text: rgba(255, 255, 255, 0.78);
+  --rail-text-active: #ffffff;
+  --rail-text-dim: rgba(255, 255, 255, 0.46);
+  --rail-hover: rgba(255, 255, 255, 0.07);
+  --rail-active: rgba(146, 130, 255, 0.26);
+  --rail-chip: rgba(255, 255, 255, 0.09);
 }
 
 :root {
@@ -87,6 +110,9 @@
   --tile-gap-x: 26px;
   --tile-gap-y: 20px;
   --transition: 150ms ease;
+  /* Category rail widths (expanded / icon-only). */
+  --rail-width: 212px;
+  --rail-width-collapsed: 60px;
 }
 
 /* ---------- base ---------- */
@@ -721,131 +747,184 @@ img {
   text-align: center;
 }
 
-/* ---------- scroll layout: category rail + chips ---------- */
+/* ---------- scroll layout: full-height category rail + chips ---------- */
 
-.scroll-layout__body {
+/*
+ * The scroll layout breaks out of the centred page container so the rail can
+ * sit on the real page edge: the shell is full width, the header keeps its own
+ * centred container, and the content column re-centres itself in the space the
+ * rail leaves over.
+ */
+.page--rail {
+  width: 100%;
+  max-width: none;
+  padding: 0;
+}
+
+.page--rail .site-header {
+  width: min(100%, var(--page-width));
+  margin: 0 auto;
+  padding: 18px clamp(14px, 3.4vw, 40px) 14px;
+}
+
+.rail-layout {
   display: grid;
-  grid-template-columns: 236px minmax(0, 1fr);
-  gap: 26px;
+  grid-template-columns: var(--rail-width) minmax(0, 1fr);
   align-items: start;
 }
 
-.scroll-layout__content {
+.rail-layout.is-collapsed {
+  grid-template-columns: var(--rail-width-collapsed) minmax(0, 1fr);
+}
+
+.rail-main {
   min-width: 0;
 }
 
-/* Keep the grid column in step with the collapsed rail. */
-.scroll-layout__body.is-collapsed {
-  grid-template-columns: 64px minmax(0, 1fr);
+.rail-main__inner {
+  width: min(100%, var(--page-width));
+  margin: 0 auto;
+  padding: 8px clamp(14px, 3.4vw, 40px) 64px;
 }
 
-.sidebar {
+/* The rail itself: a flat column on the page edge, not a floating card. */
+.rail {
   position: sticky;
-  /* Clears the page header so the rail never hides behind it. */
-  top: 16px;
+  top: 0;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 32px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow-card);
-  backdrop-filter: blur(18px) saturate(150%);
-  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  height: 100vh;
+  padding: 14px 0 10px;
+  background: var(--rail-bg);
+  border-right: 1px solid var(--rail-border);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
   overflow: hidden;
 }
 
-.sidebar--collapsed {
-  width: 64px;
-}
-
-.sidebar__head {
+.rail__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
-  padding: 8px 8px 6px 12px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  gap: 8px;
+  min-height: 26px;
+  padding: 0 12px 10px;
 }
 
-.sidebar__title {
-  font-size: 0.76rem;
+.rail__title {
+  font-size: 0.7rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  color: var(--text-dim);
+  letter-spacing: 0.12em;
+  color: var(--rail-text-dim);
 }
 
-.sidebar__toggle {
-  min-width: 30px;
-  padding: 0 8px;
+.rail__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--rail-text-dim);
+  font: inherit;
   font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
 }
 
-.sidebar__list {
+.rail__toggle:hover {
+  background: var(--rail-hover);
+  color: var(--rail-text-active);
+}
+
+.rail__list {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 6px;
+  gap: 1px;
+  padding: 0 8px 8px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
-.sidebar__item {
-  display: flex;
+.rail__list::-webkit-scrollbar { width: 6px; }
+.rail__list::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.rail__item {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
   width: 100%;
-  padding: 7px 9px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
   background: transparent;
-  color: var(--text-sub);
+  color: var(--rail-text);
   font: inherit;
   font-size: 0.86rem;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
-  transition: background var(--transition), color var(--transition), border-color var(--transition);
+  transition: background var(--transition), color var(--transition);
 }
 
-.sidebar__item:hover {
-  background: var(--surface-strong);
-  color: var(--text-main);
+.rail__item:hover {
+  background: var(--rail-hover);
+  color: var(--rail-text-active);
 }
 
-.sidebar__item.is-active {
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
-  color: var(--text-main);
+/* A soft tint, deliberately not a loud accent block. */
+.rail__item.is-active {
+  background: var(--rail-active);
+  color: var(--rail-text-active);
 }
 
-.sidebar__icon {
+.rail__icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 4px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--surface-strong) 80%, transparent);
-  font-size: 0.78rem;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--rail-chip);
+  font-size: 0.76rem;
   line-height: 1;
 }
 
-.sidebar__label {
-  flex: 1;
+.rail__label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.sidebar__count {
-  flex-shrink: 0;
+.rail__count {
   font-size: 0.7rem;
   font-weight: 700;
-  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  color: var(--rail-text-dim);
+}
+
+/* Collapsed: icons only, centred in a narrow strip. */
+.rail--collapsed .rail__head {
+  justify-content: center;
+  padding: 0 0 10px;
+}
+
+.rail--collapsed .rail__item {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding: 8px 0;
 }
 
 /* The chip bar is the narrow-screen replacement for the rail. */
@@ -1204,9 +1283,12 @@ img {
 
 @media (max-width: 1080px) {
   /* Narrow desktop / tablet: the rail becomes an icon-only strip. */
-  .scroll-layout__body { grid-template-columns: 64px minmax(0, 1fr); }
-  .sidebar { width: 64px; }
-  .sidebar__item { justify-content: center; padding: 7px 4px; }
+  .rail-layout { grid-template-columns: var(--rail-width-collapsed) minmax(0, 1fr); }
+  .rail__head { justify-content: center; padding: 0 0 10px; }
+  .rail__item { grid-template-columns: 1fr; justify-items: center; padding: 8px 0; }
+  .rail__title,
+  .rail__label,
+  .rail__count { display: none; }
 }
 
 @media (max-width: 1000px) {
@@ -1233,9 +1315,13 @@ img {
 
   .page { padding-bottom: 48px; }
 
-  /* Phone: no fixed rail; a sticky chip bar handles category jumping. */
-  .scroll-layout__body { display: block; }
-  .scroll-layout__sidebar { display: none; }
+  /* Phone: no rail; a sticky chip bar handles category jumping. */
+  .rail-layout,
+  .rail-layout.is-collapsed { grid-template-columns: minmax(0, 1fr); }
+
+  .rail { display: none; }
+
+  .rail-main__inner { padding-top: 4px; }
 
   .chipbar {
     display: flex;

@@ -9,11 +9,14 @@ import { useSiteStore } from '@/stores/site'
 import { clampScrollTop, isAtBottom, pickActiveIndex } from '@/utils/scrollSpy'
 
 /**
- * Scroll layout: every category stacked vertically, with a fixed category rail
- * on the left (PC) and a sticky category chip bar on narrow screens.
+ * Scroll layout.
+ *
+ * The page is a two-column shell: a category rail pinned to the page's left
+ * edge (full height below the header, independently scrollable) and a content
+ * column that holds the clock, search and every category. Both read the same
+ * `site.categories`, so there is only ever one data source.
  *
  * Clicking a category smooth-scrolls to it; scrolling updates the highlight.
- * Both read the same `site.categories`, so there is only ever one data source.
  */
 const site = useSiteStore()
 const { query, results, searching, engines, defaultEngine, showResults, openEngine } = useNavSearch()
@@ -121,39 +124,27 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="scroll-layout">
-    <section class="clock">
-      <div class="clock__time">{{ clock }}</div>
-      <div class="clock__date">{{ dateLabel }}</div>
-    </section>
+  <div class="rail-layout" :class="{ 'is-collapsed': sidebarCollapsed }">
+    <CategorySidebar
+      v-if="site.categories.length"
+      :categories="site.categories"
+      :active-id="activeId"
+      :collapsed="sidebarCollapsed"
+      @select="scrollToCategory"
+      @toggle="toggleSidebar"
+    />
 
-    <SearchBar v-model="query" :engines="engines" :default-engine="defaultEngine" @submit="openEngine" />
+    <div class="rail-main">
+      <div class="rail-main__inner">
+        <section class="clock">
+          <div class="clock__time">{{ clock }}</div>
+          <div class="clock__date">{{ dateLabel }}</div>
+        </section>
 
-    <template v-if="showResults">
-      <section class="category">
-        <div class="category__head">
-          <h2 class="category__title">搜索结果</h2>
-          <span class="badge">{{ results.length }}</span>
-          <span v-if="searching" class="spinner" />
-        </div>
-        <BookmarkGrid v-if="results.length" :bookmarks="results" :default-new-tab="site.settings?.open_in_new_tab_default ?? true" />
-        <p v-else-if="!searching" class="dim" style="font-size: 0.86rem">没有匹配的站点</p>
-      </section>
-    </template>
+        <SearchBar v-model="query" :engines="engines" :default-engine="defaultEngine" @submit="openEngine" />
 
-    <div v-else-if="site.categories.length" class="scroll-layout__body" :class="{ 'is-collapsed': sidebarCollapsed }">
-      <CategorySidebar
-        class="scroll-layout__sidebar"
-        :categories="site.categories"
-        :active-id="activeId"
-        :collapsed="sidebarCollapsed"
-        @select="scrollToCategory"
-        @toggle="toggleSidebar"
-      />
-
-      <div class="scroll-layout__content">
         <!-- Narrow screens: a sticky chip bar replaces the rail. -->
-        <nav class="chipbar" aria-label="分类快速跳转">
+        <nav v-if="site.categories.length" class="chipbar" aria-label="分类快速跳转">
           <button
             v-for="category in site.categories"
             :key="category.id"
@@ -167,15 +158,33 @@ onUnmounted(() => {
           </button>
         </nav>
 
-        <CategorySection
-          v-for="category in site.categories"
-          :key="category.id"
-          :category="category"
-          :default-new-tab="site.settings?.open_in_new_tab_default ?? true"
-        />
+        <template v-if="showResults">
+          <section class="category">
+            <div class="category__head">
+              <h2 class="category__title">搜索结果</h2>
+              <span class="badge">{{ results.length }}</span>
+              <span v-if="searching" class="spinner" />
+            </div>
+            <BookmarkGrid
+              v-if="results.length"
+              :bookmarks="results"
+              :default-new-tab="site.settings?.open_in_new_tab_default ?? true"
+            />
+            <p v-else-if="!searching" class="dim" style="font-size: 0.86rem">没有匹配的站点</p>
+          </section>
+        </template>
+
+        <template v-else-if="site.categories.length">
+          <CategorySection
+            v-for="category in site.categories"
+            :key="category.id"
+            :category="category"
+            :default-new-tab="site.settings?.open_in_new_tab_default ?? true"
+          />
+        </template>
+
+        <div v-else class="empty">还没有任何公开分类</div>
       </div>
     </div>
-
-    <div v-else-if="!site.loading && !site.error" class="empty">还没有任何公开分类</div>
   </div>
 </template>
