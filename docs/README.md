@@ -15,7 +15,9 @@
 | [api-contract-review.md](api-contract-review.md) | API 契约一致性检查 |
 | [database-design.md](database-design.md) | 数据库设计、迁移与备份策略 |
 | [legacy-data-migration-report.md](legacy-data-migration-report.md) | **旧站真实数据迁移报告（字段映射、导入结果、异常数据）** |
-| [deployment.md](deployment.md) | Docker 部署、更新与排障 |
+| [installation.md](installation.md) | **安装指南（前置条件、两种模式、首次使用、排障）** |
+| [updating.md](updating.md) | **更新、备份、恢复与回滚指南（含迁移兼容性）** |
+| [deployment.md](deployment.md) | 部署总览与关键设计约束 |
 | [frontend-agent-guide.md](frontend-agent-guide.md) | 面向其他 AI Agent 的前端交接规范 |
 
 ## 测试样本
@@ -38,6 +40,7 @@
 | 文件 | 内容 |
 | --- | --- |
 | [openapi/openapi.yaml](openapi/openapi.yaml) | OpenAPI 3.1 机器可读契约（基线） |
+| [../SECURITY.md](../SECURITY.md) | 安全策略与部署加固清单 |
 
 ## 决策记录
 
@@ -59,4 +62,5 @@
 | [deliveries/P2-delivery.md](deliveries/P2-delivery.md) | **P2 阶段交付报告（正式归档）** |
 | [deliveries/P3-delivery.md](deliveries/P3-delivery.md) | **P3 阶段交付报告（正式归档）** |
 | [deliveries/P4-delivery.md](deliveries/P4-delivery.md) | **P4 阶段交付报告（正式归档）** |
+| [deliveries/P5-delivery.md](deliveries/P5-delivery.md) | **P5 阶段交付报告（正式归档）** |
 | [deliveries/](deliveries/) | 过程记录与后续阶段交付报告 |

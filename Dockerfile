@@ -14,7 +14,14 @@ COPY frontend/ ./
 RUN npm run build
 
 # ---------- Stage 2: backend ----------
-FROM golang:1.24-alpine AS backend
+# Keep this in sync with the `go` directive in backend/go.mod.
+FROM golang:1.26-alpine AS backend
+
+# Module proxy. Override if your network cannot reach the default proxy, e.g.
+#   docker build --build-arg GOPROXY=https://goproxy.cn,direct .
+ARG GOPROXY=https://proxy.golang.org,direct
+ENV GOPROXY=${GOPROXY}
+
 WORKDIR /src
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download

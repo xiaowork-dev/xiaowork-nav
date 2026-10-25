@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (Go)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Build
+        working-directory: backend
+        run: go build ./...
+
+      - name: Vet
+        working-directory: backend
+        run: go vet ./...
+
+      - name: Test
+        working-directory: backend
+        run: go test -count=1 ./...
+
+  frontend:
+    name: Frontend (Vue)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Type check and build
+        working-directory: frontend
+        run: npm run build
+
+  docker:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: xiaowork-nav:ci
+          build-args: |
+            VERSION=ci
+            COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ github.run_id }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test the image
+        run: |
+          docker run -d --name xn-ci -p 18080:8080 \
+            -e XN_DATA_DIR=/data -e XN_SECURE_COOKIE=false xiaowork-nav:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18080/healthz >/dev/null 2>&1; then
+              echo "healthy"; break
+            fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:18080/healthz
+          curl -fsS http://127.0.0.1:18080/api/v1/version
+          curl -fsS http://127.0.0.1:18080/ | grep -q '<div id="app">'
+          docker rm -f xn-ci
+
+  repository-safety:
+    name: Repository safety
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No user data, databases or secrets committed
+        run: |
+          set -eu
+          fail=0
+
+          # Real navigation data, databases, backups and local env files.
+          if git ls-files | grep -nE '(^|/)(data\.json|legacy-data\.json|.*\.db|.*\.db-wal|.*\.db-shm|\.env)$'; then
+            echo "::error::forbidden file is tracked by git"
+            fail=1
+          fi
+          if git ls-files | grep -nE '^docs/screenshots/'; then
+            echo "::error::screenshots may contain real user data"
+            fail=1
+          fi
+
+          # Obvious secret material.
+          if git grep -nE 'BEGIN (RSA|OPENSSH|EC|PGP) PRIVATE KEY' -- . ':!*.md'; then
+            echo "::error::private key material found"
+            fail=1
+          fi
+
+          exit $fail
+
+      - name: Shell scripts are valid
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          for f in scripts/*.sh; do
+            bash -n "$f"
+            shellcheck --severity=error "$f"
+          done

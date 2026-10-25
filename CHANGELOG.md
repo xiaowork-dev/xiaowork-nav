@@ -4,84 +4,69 @@
 
 ## [Unreleased]
 
-### Added — P3（Vue 3 前端功能与联调）
+## [2.0.0] - 2026-10-25
 
-- **导航首页**：时钟、搜索引擎切换搜索框、分类分组与图标磁贴、主题切换、响应式布局。
-- **图标显示链**：用户图标（url/upload/simple/text）→ 站点 Favicon → 首字母占位；自动步骤仅为显示回退，不改写已存储的图标地址。
-- **数据模型扩展**（迁移 `0002`，非破坏性加列）：`categories.icon` / `categories.color` / `bookmarks.tags` / `bookmarks.color`；`icon_type` 扩展为 `none|url|upload|auto|favicon|simple|text`。
-- **Simple Icons 校验**：内置 3,494 个官方 slug 白名单（`go:embed`），只有命中白名单的 `si` 才映射为 `icon_type=simple`。
-- **搜索**：调用后端 `/api/v1/public/search`（防抖），失败回退本地过滤；回车使用所选引擎搜索。
-- **初始化与认证**：首次初始化向导、管理员登录/退出、路由守卫（未初始化强制向导；管理路由未登录跳转并携带 `redirect`）。
-- **分类管理**：增删改、公开/私有切换、拖拽排序与移动端 ↑↓ 排序、删除二次确认。
-- **网站管理**：按分类筛选与关键词搜索、增删改、跨分类移动、公开/私有切换、图标上传/抓取/手填。
-- **系统设置**：站点标题/Favicon、默认主题、首页布局、默认新标签、游客访问开关、搜索引擎增删与默认项；修改密码。
-- **数据管理**：导出 JSON（浏览器下载）、导入（文件 → 预览 → 冲突策略 → 执行）、备份列表/创建/恢复、版本检查。
-- **旧站数据迁移**：`legacy-v1` 支持顶层数组结构、`category`/`items`/`logo`/`si`/`tag`/`color`/`logoType` 字段；内嵌 `data:image/svg+xml` 图标解码为本地上传文件；外部图标地址原样保留；顺序显式写入 `sort_order`。详见 [迁移报告](docs/legacy-data-migration-report.md)。
-- **前端基础设施**：`src/api` 统一 HTTP 出口、Pinia 状态、`useDragSort`/`useTheme`/`useToast`、CSS 变量主题（浅色/深色）。
-- **测试**：后端测试数增至 58。
+首个正式发布：轻量、可自托管、可一键部署与更新的个人导航站。
 
-### Changed — P3
+### Added
 
-- 后端路由重构为单一来源 `internal/api/routes.go`，`Handler()` 与契约测试共用。
-- 新增测试依赖 `gopkg.in/yaml.v3`。
+**导航前台**
+- 分类分组与图标磁贴首页，含时钟与响应式布局（桌面 / 平板 / 手机 390px）。
+- 搜索：服务端搜索（名称 / 描述 / 关键词）+ 可配置搜索引擎切换，回车用所选引擎搜索。
+- 图标回退链：用户图标（图片地址 / 本地上传 / Simple Icons 标识 / 文字图标）→ 站点
+  Favicon → 首字母；自动步骤仅为显示回退，不会改写已保存的图标地址。
+- 明暗主题，默认跟随系统，支持本地覆盖。
 
-### Changed — P4（UI、交互与主题优化）
+**管理后台**
+- 首次运行初始化向导（一次性创建管理员，之后关闭入口）。
+- 分类与网站的增删改查、拖拽排序、移动端 ↑↓ 排序替代、公开/私有可见性。
+- 网站管理分页（每页 20/50/100 条）与显式「排序模式」。
+- 图标：本地上传、外部地址、已验证的 Simple Icons 标识、文字图标、站点图标抓取。
+- 系统设置：站点标题 / Favicon / 主题 / 首页布局 / 搜索引擎 / 游客访问开关；修改密码。
+- 数据管理：JSON 导出、导入（含预览与冲突策略）、备份创建与恢复、版本检查。
 
-- **整页渐变背景**：移除 `background-attachment: fixed`（此前首屏以下出现白色断层），改为整页渐变 + 纯色兜底。
-- **浅色主题重做**：由近纯白改为可见的淡紫/粉渐变，保留渐变特色。
-- **磁贴空白修复**：底层始终渲染首字母占位，图片加载完成后覆盖；仅在真实失败或退化图片（≤1×1）时回退，避免把懒加载误判为损坏。
-- **分类层级**：分类标题增加 emoji 徽标与数量胶囊、分隔线。
-- **搜索框**：改为圆角胶囊（引擎下拉 + 输入 + 按钮），移动端自适应。
-- **管理后台**：侧栏/卡片/列表/表单/弹窗视觉统一，列表元信息补充图标类型与标签。
-- **响应式**：1000px / 700px / 380px 三档断点，移动端四列磁贴与触控排序按钮。
-- **可访问性**：统一 `:focus-visible`，补充 `aria-label` 与 `sr-only` 说明。
+**数据与迁移**
+- SQLite（WAL）持久化，版本化迁移（`schema_migrations`，事务执行，失败拒绝启动）。
+- 旧站数据导入：支持顶层数组结构，识别 `category`/`items`/`logo`/`si`/`tag`/`color`/`iconType`；
+  内嵌 `data:image/svg+xml` 图标解码为本地上传文件（内容无损）；外部图标地址原样保留。
+- 备份快照同时覆盖数据库与上传图标。
 
-### Changed — P4 收尾优化
+**部署与运维**
+- 多阶段 `Dockerfile`：前端构建 → Go(embed) → 精简非 root 运行镜像（约 36 MB）。
+- 一键安装脚本 `scripts/install.sh`，以及 `deploy.sh` / `update.sh` / `backup.sh` / `restore.sh`。
+- Docker Compose 两种模式：独立模式（默认 `127.0.0.1:8787`）与 NPM 共享网络模式（不发布端口）。
+- 更新前自动一致性快照；失败时自动回滚；结构版本保护（旧镜像拒绝打开新数据库）。
+- GitHub Actions：CI（构建 / 测试 / 镜像构建 / 仓库安全检查）与 Release（多架构镜像推送
+  GHCR + GitHub Release）。
+- 全部部署参数通过环境变量配置，未写死域名或网络名。
 
-- **移动端管理后台列表**：列表行改为 CSS Grid；移动端「名称 + 数量」一行、操作另起一行，操作按钮最小 38px 且不换行，长名称省略号显示；桌面端布局不变。
-- **首页权重调整**：时钟字号 57.6px → 33.6px（移动端 24px）并降为次要色，搜索框提升到 56px / 16px。
-- **网站名称**：最多两行 + 省略号（`-webkit-line-clamp: 2`），`word-break: keep-all` 避免逐字断词。
-- **网站管理分页**：新增每页 20/50/100 条分页与首页/上一页/下一页/末页，保留分类筛选与搜索。
-- **排序模式**：拖拽排序改为显式模式，进入后加载所选分类全部条目再排序，避免分页导致排序错乱。
-- **表单竖排修复**：`.btn` 全局 `white-space: nowrap`；搜索引擎编辑区改用 `.engine-row` 网格布局。
+### Changed
 
-### Fixed — P3
+- 前端整页渐变背景（不再依赖 `background-attachment: fixed`）；浅色主题增强。
+- 磁贴底层始终渲染首字母占位，避免加载中或图标失效时出现空白方块。
+- 移动端管理后台列表改为两行布局（名称在上、操作在下），触控目标 ≥38px。
 
-- 手动填写图标地址时自动同步 `icon_type=url`（此前会被后端清空）。
-- 保存系统设置后刷新站点信息，页头标题即时更新。
-- 导入时分类 `sort_order` 被硬编码为 0（现按导入顺序写入 10,20,30…）。
-- 导入冲突检测改为按分类名解析后比对 URL（此前使用数据包内 ID，可能误判）。
-- 书签引用未知分类时改为跳过，不再猜测可能撞车的 ID。
-- 内嵌 data URI 图标导入失败时不再遗留孤儿文件与上传记录（事务失败即清理）。
-- 上传的 SVG 内容校验改为必须包含 `<svg` 根元素，防止 HTML 伪装成图标。
-- `sanitizeIcons` 中"空值即无图标"的判断先于 favicon 分支，导致 `favicon` 类型被误降级。
+### Fixed
 
-### Added — P2（Go 后端核心业务）
+- 导入时分类 `sort_order` 被硬编码为 0。
+- 导入冲突检测使用数据包内 ID，可能误判。
+- 书签引用未知分类时猜测 ID 可能撞车。
+- 导入失败时遗留孤儿图标文件与上传记录。
+- HTML 内容可伪装成 `.svg` 图标。
+- 内嵌图标转换失败时未清理。
+- 手动填写图标地址时 `icon_type` 未同步为 `url`。
+- 保存系统设置后页头标题不刷新。
 
-- **认证**：一次性初始化管理员（Argon2id）、登录/登出、会话（服务端会话 + HttpOnly Cookie）、改密（改密后使全部会话失效）、登录限流（按 IP 与用户名）。
-- **安全**：Origin/Referer 校验（CSRF 防护）、请求体大小限制、统一错误信封、URL 协议白名单、SSRF 防护的图标抓取、上传文件类型/体积校验、非 root 容器。
-- **分类**：增删改查、排序、公开/私有（`is_visible`）。
-- **导航项**：增删改查、排序、跨分类移动、可见性、图标类型、关键词、打开方式。
-- **公开接口**：导航树聚合、分类、分类下导航项、搜索、公开设置、上传图标读取。
-- **系统设置**：公开/管理视图分离、部分更新、取值校验。
-- **图标**：上传（PNG/JPEG/WebP/GIF/ICO/SVG，≤1 MiB）与服务端抓取（防 SSRF）。
-- **导入导出**：JSON 导出（含 `format`/`schema_version`/`checksum`）、导入预览、导入执行（`skip`/`overwrite`/`rename`，单事务，默认不覆盖）、旧站 `legacy-v1` 宽松映射。
-- **备份恢复**：`VACUUM INTO` 快照（含图标目录）、快照列表、恢复（校验结构版本 + 自动安全快照）。
-- **更新检查**：可选 GitHub Release 版本检查（只读）。
+### Security
 
-### Changed — P2
+- Argon2id 密码哈希；服务端会话 + `HttpOnly`/`SameSite` Cookie（生产 `Secure`）。
+- 状态变更请求校验 `Origin`/`Referer`；登录按 IP 与用户名限流。
+- URL 协议白名单（仅 http/https）；图标抓取防 SSRF（含云元数据地址与重定向限制）。
+- 上传大小 / 类型 / 文件名白名单校验；SVG 以沙箱 CSP 提供，绝不以 HTML 注入。
+- 容器非 root 运行并启用 `no-new-privileges`。
+- 数据库结构版本高于镜像时拒绝启动，避免降级破坏数据。
 
-- 新增 `GET /api/v1/public/uploads/{filename}`（契约同步更新）。
-- 新增环境变量 `XN_SECURE_COOKIE`（默认 true）、`XN_BACKUP_KEEP`、`XN_UPDATE_REPO`。
-- 后端模块扩展：`internal/{models,auth,security,service}`，`store` 增加仓储层。
+### Notes
 
-### Added — P1（项目初始化）
-
-- 项目骨架：Go 后端（配置、SQLite、迁移、HTTP 路由与中间件）、Vue 3 前端骨架。
-- Docker 部署工件：`Dockerfile`、`deploy/compose.yaml`、`scripts/deploy.sh`、`scripts/update.sh`。
-- 文档体系：开发计划、架构、API 规范、数据库设计、前端交接规范、ADR、进度与交付记录。
-
-### 说明
-
-- 移动端视口/真机、跨浏览器、Docker 镜像构建与旧站真实数据导入尚未验证。
-
+- 升级方式见 [docs/updating.md](docs/updating.md)；安装方式见 [docs/installation.md](docs/installation.md)。
+- 旧站导入的字段映射与异常数据说明见 [docs/legacy-data-migration-report.md](docs/legacy-data-migration-report.md)。

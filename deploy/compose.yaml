@@ -28,10 +28,13 @@ services:
       XN_UPDATE_REPO: ${XN_UPDATE_REPO:-}
       XN_TRUSTED_PROXIES: ${XN_TRUSTED_PROXIES:-}
       XN_ALLOWED_ORIGINS: ${XN_ALLOWED_ORIGINS:-}
+      TZ: ${TZ:-UTC}
     ports:
       - "${XN_BIND_ADDR:-127.0.0.1}:${XN_PUBLISH_PORT:-8787}:8080"
     volumes:
       - ${XN_DATA_HOST_DIR:-./data}:/data
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
       interval: 30s

@@ -1,6 +1,7 @@
 package migrations
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -162,5 +163,44 @@ func TestExtendedColumnsExist(t *testing.T) {
 	}
 	if latest < 2 {
 		t.Errorf("latest migration version = %d, want >= 2", latest)
+	}
+}
+
+
+// TestCheckCompatibleRejectsNewerSchema verifies that a database migrated by a
+// newer build is detected, which is what makes rollbacks safe to reason about.
+func TestCheckCompatibleRejectsNewerSchema(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("store.Open() error = %v", err)
+	}
+	defer db.Close()
+	if _, err := Apply(db); err != nil {
+		t.Fatalf("Apply() error = %v", err)
+	}
+
+	// Same version: compatible.
+	current, latest, err := CheckCompatible(db)
+	if err != nil {
+		t.Fatalf("CheckCompatible() error = %v", err)
+	}
+	if current != latest {
+		t.Fatalf("current=%d latest=%d, want equal", current, latest)
+	}
+
+	// Pretend a newer build applied a future migration.
+	if _, err := db.Exec(
+		`INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)`,
+		latest+1, "future", "now",
+	); err != nil {
+		t.Fatalf("insert future migration: %v", err)
+	}
+
+	_, _, err = CheckCompatible(db)
+	if err == nil {
+		t.Fatal("CheckCompatible() = nil, want ErrSchemaTooNew")
+	}
+	if !errors.Is(err, ErrSchemaTooNew) {
+		t.Errorf("error = %v, want ErrSchemaTooNew", err)
 	}
 }

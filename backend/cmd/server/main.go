@@ -49,6 +49,20 @@ func run() int {
 	}
 	defer func() { _ = db.Close() }()
 
+	// Refuse to run against a database created by a newer build: opening it
+	// with older code could corrupt data. This is what makes "roll back to the
+	// previous image" safe to detect (see docs/updating.md).
+	if current, latest, err := migrations.CheckCompatible(db); err != nil {
+		if errors.Is(err, migrations.ErrSchemaTooNew) {
+			logger.Error("database schema is newer than this build; refusing to start",
+				"database_schema", current, "build_schema", latest,
+				"hint", "restore the pre-update backup or deploy a matching image version")
+			return 1
+		}
+		logger.Error("check schema compatibility", "error", err)
+		return 1
+	}
+
 	applied, err := migrations.Apply(db)
 	if err != nil {
 		// A failed migration must stop startup: never run half-migrated.

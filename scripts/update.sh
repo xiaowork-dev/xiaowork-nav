@@ -2,36 +2,40 @@
 #
 # XiaoWork Nav — safe one-command update.
 #
-# Steps:
-#   1. read current version from deploy/.env
-#   2. stop the app and take a consistent snapshot of the data directory
-#   3. switch APP_VERSION atomically
-#   4. pull the target image and start
-#   5. verify health; on failure restore the previous version and restart
+#   ./scripts/update.sh v2.0.1              # update to a specific release
+#   ./scripts/update.sh latest              # update to the latest release
+#   ./scripts/update.sh v2.0.1 --compose compose.npm.yaml
+#   ./scripts/update.sh v2.0.1 --local      # use a locally built image (no pull)
+#   ./scripts/update.sh v2.0.1 --yes        # skip the confirmation prompt
 #
-# The data directory is snapshotted while the container is stopped so that the
-# SQLite database is captured consistently. A proper online backup arrives with
-# the in-app backup feature.
+# What it does:
+#   1. records the current version and database schema version
+#   2. stops the app and takes a consistent snapshot of the data directory
+#      (database + uploaded icons + backups)
+#   3. switches APP_VERSION atomically and starts the new image
+#   4. waits for /healthz and verifies the schema version
+#   5. on failure: restores the snapshot when the new build migrated the
+#      database, then starts the previous image again
 #
-# Usage:
-#   ./scripts/update.sh [VERSION] [--compose compose.npm.yaml] [--yes]
-#   VERSION defaults to "latest".
+# Data is never deleted. See docs/updating.md for the manual equivalents.
 
 set -Eeuo pipefail
 
+SCRIPT_NAME="update"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 DEPLOY_DIR="${ROOT_DIR}/deploy"
 ENV_FILE="${DEPLOY_DIR}/.env"
-
-TARGET_VERSION=""
 COMPOSE_FILE="compose.yaml"
+TARGET_VERSION=""
 ASSUME_YES=0
+LOCAL_IMAGE=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --compose) COMPOSE_FILE="${2:?missing value for --compose}"; shift 2 ;;
     --yes|-y)  ASSUME_YES=1; shift ;;
+    --local)   LOCAL_IMAGE=1; shift ;;
     -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
     -*)        echo "unknown argument: $1" >&2; exit 2 ;;
     *)         TARGET_VERSION="$1"; shift ;;
@@ -39,113 +43,108 @@ while [[ $# -gt 0 ]]; do
 done
 TARGET_VERSION="${TARGET_VERSION:-latest}"
 
-log()  { printf '\033[1;34m[update]\033[0m %s\n' "$*"; }
-warn() { printf '\033[1;33m[warn]\033[0m %s\n' "$*" >&2; }
-die()  { printf '\033[1;31m[error]\033[0m %s\n' "$*" >&2; exit 1; }
+# shellcheck source=scripts/lib.sh
+source "${SCRIPT_DIR}/lib.sh"
 
-command -v docker >/dev/null 2>&1 || die "docker is required but was not found"
-docker compose version >/dev/null 2>&1 || die "the Docker Compose plugin is required"
-[[ -f "${ENV_FILE}" ]] || die "missing ${ENV_FILE}; run deploy.sh first"
-
-COMPOSE_PATH="${DEPLOY_DIR}/${COMPOSE_FILE}"
-[[ -f "${COMPOSE_PATH}" ]] || die "compose file not found: ${COMPOSE_PATH}"
-
-compose() {
-  docker compose -f "${COMPOSE_PATH}" --env-file "${ENV_FILE}" "$@"
-}
-
-get_env() {
-  local key="$1"
-  grep -E "^${key}=" "${ENV_FILE}" | tail -n1 | cut -d= -f2- || true
-}
-
-set_env() {
-  local key="$1" value="$2" tmp
-  tmp="$(mktemp)"
-  if grep -qE "^${key}=" "${ENV_FILE}"; then
-    awk -v k="${key}" -v v="${value}" \
-      'BEGIN{FS=OFS="="} $1==k{ $0=k"="v } {print}' "${ENV_FILE}" > "${tmp}"
-  else
-    cat "${ENV_FILE}" > "${tmp}"
-    printf '%s=%s\n' "${key}" "${value}" >> "${tmp}"
-  fi
-  mv "${tmp}" "${ENV_FILE}"
-}
+require_docker
+require_env_file
+validate_compose
 
 CURRENT_VERSION="$(get_env APP_VERSION)"
 CURRENT_VERSION="${CURRENT_VERSION:-unknown}"
 
 if [[ "${TARGET_VERSION}" == "${CURRENT_VERSION}" ]]; then
-  log "already at version ${TARGET_VERSION}; nothing to do"
+  log "already on ${TARGET_VERSION}; nothing to do"
   exit 0
 fi
 
-DATA_DIR="$(get_env XN_DATA_HOST_DIR)"
-DATA_DIR="${DATA_DIR:-./data}"
-case "${DATA_DIR}" in
-  /*) : ;;                       # absolute
-  *) DATA_DIR="${DEPLOY_DIR}/${DATA_DIR#./}" ;;
-esac
-[[ -d "${DATA_DIR}" ]] || die "data directory not found: ${DATA_DIR}"
-
-BACKUP_DIR="${DATA_DIR}/../xiaowork-nav-backups"
-mkdir -p "${BACKUP_DIR}"
-STAMP="$(date -u +%Y%m%d-%H%M%S)"
-SNAPSHOT="${BACKUP_DIR}/pre-update-${CURRENT_VERSION}-${STAMP}.tar.gz"
-
-log "current version: ${CURRENT_VERSION} -> target: ${TARGET_VERSION}"
+log "current version: ${CURRENT_VERSION}  ->  target: ${TARGET_VERSION}"
 if [[ "${ASSUME_YES}" -ne 1 ]]; then
   printf 'Proceed? [y/N] '
   read -r answer
   [[ "${answer}" == "y" || "${answer}" == "Y" ]] || die "aborted by user"
 fi
 
-log "stopping app for a consistent snapshot"
-compose stop app || true
+# --- 1. record the current state -------------------------------------------
+SCHEMA_BEFORE="$(app_schema_version || true)"
+if [[ -n "${SCHEMA_BEFORE}" ]]; then
+  log "current database schema version: ${SCHEMA_BEFORE}"
+else
+  warn "could not read the current schema version (app may be stopped)"
+fi
 
-log "snapshotting data directory -> ${SNAPSHOT}"
-tar -czf "${SNAPSHOT}" -C "${DATA_DIR}" . || die "snapshot failed; aborting before any change"
-log "snapshot size: $(du -h "${SNAPSHOT}" | cut -f1)"
+# --- 2. stop + snapshot ----------------------------------------------------
+log "stopping the application for a consistent snapshot"
+compose stop "${SERVICE_NAME}" || true
+
+SNAPSHOT="$(snapshot_data_dir)"
+log "snapshot written to ${SNAPSHOT}"
 
 rollback() {
-  warn "update failed — rolling back to ${CURRENT_VERSION}"
+  local reason="$1"
+  warn "update failed: ${reason}"
+
+  if [[ -n "${SCHEMA_BEFORE}" ]]; then
+    local schema_after
+    schema_after="$(app_schema_version || true)"
+    if [[ -n "${schema_after}" && "${schema_after}" -gt "${SCHEMA_BEFORE}" ]]; then
+      warn "the new build migrated the database (schema ${SCHEMA_BEFORE} -> ${schema_after});"
+      warn "the previous image cannot read it, so the data snapshot must be restored first."
+      restore_snapshot "${SNAPSHOT}"
+    fi
+  fi
+
+  log "switching back to ${CURRENT_VERSION}"
   set_env APP_VERSION "${CURRENT_VERSION}"
-  compose up -d || warn "rollback restart failed; manual attention required"
+  if compose up -d; then
+    log "rolled back to ${CURRENT_VERSION}"
+  else
+    warn "rollback start failed; manual attention required"
+  fi
   warn "data snapshot kept at: ${SNAPSHOT}"
-  warn "if the new version ran an irreversible migration, restore the snapshot before starting the old version"
+  exit 1
 }
 
-log "switching version"
+restore_snapshot() {
+  local snapshot="$1" data_dir
+  data_dir="$(data_host_dir)"
+  log "restoring data from ${snapshot}"
+  rm -rf "${data_dir:?}"/* 2>/dev/null || true
+  # shellcheck disable=SC2086  # TAR_EXTRA is intentionally word-split (may be empty)
+  tar ${TAR_EXTRA} -xzf "${snapshot}" -C "${data_dir}" || die "failed to restore snapshot ${snapshot}"
+}
+
+# --- 3. switch version and start ------------------------------------------
+log "switching APP_VERSION to ${TARGET_VERSION}"
 set_env APP_VERSION "${TARGET_VERSION}"
 
-log "pulling image"
-if ! compose pull; then
-  rollback
-  die "image pull failed"
+if [[ "${LOCAL_IMAGE}" -eq 0 ]]; then
+  log "pulling $(image_ref)"
+  if ! compose pull; then
+    rollback "image pull failed"
+  fi
 fi
 
-log "starting updated app"
+log "starting the updated application"
 if ! compose up -d; then
-  rollback
-  die "container start failed"
+  rollback "container start failed"
 fi
 
+# --- 4. verify -------------------------------------------------------------
 log "verifying health"
-cid="$(compose ps -q app)"
-deadline=$((SECONDS + 90))
-status="unknown"
-while [[ ${SECONDS} -lt ${deadline} ]]; do
-  status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${cid}" 2>/dev/null || echo unknown)"
-  [[ "${status}" == "healthy" || "${status}" == "running" ]] && break
-  [[ "${status}" == "unhealthy" ]] && break
-  sleep 3
-done
+if ! status="$(wait_for_health 120)"; then
+  compose logs --tail=80 "${SERVICE_NAME}" || true
+  rollback "health check failed (status: ${status})"
+fi
 
-if [[ "${status}" != "healthy" && "${status}" != "running" ]]; then
-  compose logs --tail=60 app || true
-  rollback
-  die "health check failed (status: ${status})"
+SCHEMA_AFTER="$(app_schema_version || true)"
+if [[ -n "${SCHEMA_BEFORE}" && -n "${SCHEMA_AFTER}" ]]; then
+  if [[ "${SCHEMA_AFTER}" -lt "${SCHEMA_BEFORE}" ]]; then
+    rollback "schema version went backwards (${SCHEMA_BEFORE} -> ${SCHEMA_AFTER})"
+  fi
+  log "database schema version: ${SCHEMA_BEFORE} -> ${SCHEMA_AFTER}"
 fi
 
 log "update complete: ${CURRENT_VERSION} -> ${TARGET_VERSION} (status: ${status})"
 log "snapshot retained at: ${SNAPSHOT}"
+log "to roll back manually: ./scripts/restore.sh ${SNAPSHOT} && APP_VERSION=${CURRENT_VERSION} ./scripts/deploy.sh --no-pull"

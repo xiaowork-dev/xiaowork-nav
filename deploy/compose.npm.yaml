@@ -31,8 +31,11 @@ services:
       XN_UPDATE_REPO: ${XN_UPDATE_REPO:-}
       XN_TRUSTED_PROXIES: ${XN_TRUSTED_PROXIES:-}
       XN_ALLOWED_ORIGINS: ${XN_ALLOWED_ORIGINS:-}
+      TZ: ${TZ:-UTC}
     volumes:
       - ${XN_DATA_HOST_DIR:-./data}:/data
+    security_opt:
+      - no-new-privileges:true
     networks:
       - proxy
     healthcheck:

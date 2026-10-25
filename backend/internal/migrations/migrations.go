@@ -10,6 +10,7 @@ package migrations
 import (
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"regexp"
@@ -93,6 +94,26 @@ func CurrentVersion(db *sql.DB) (int, error) {
 		return 0, nil
 	}
 	return int(v.Int64), nil
+}
+
+// ErrSchemaTooNew is returned when the database was migrated by a newer build
+// than the one currently running. Starting would risk corrupting data, so the
+// service must refuse to start (see docs/updating.md).
+var ErrSchemaTooNew = errors.New("database schema is newer than this build")
+
+// CheckCompatible verifies that the on-disk schema is not newer than the
+// migrations bundled with this build, and returns the current/latest versions.
+func CheckCompatible(db *sql.DB) (current, latest int, err error) {
+	if current, err = CurrentVersion(db); err != nil {
+		return 0, 0, err
+	}
+	if latest, err = LatestVersion(); err != nil {
+		return 0, 0, err
+	}
+	if current > latest {
+		return current, latest, fmt.Errorf("%w: database=%d, build=%d", ErrSchemaTooNew, current, latest)
+	}
+	return current, latest, nil
 }
 
 // Apply runs all pending migrations and returns the versions it applied.

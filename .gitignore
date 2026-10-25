@@ -50,3 +50,4 @@ legacy-data.json
 
 # Visual review artifacts rendered from real data (local only).
 docs/screenshots/
+docs/screenshots*.zip
