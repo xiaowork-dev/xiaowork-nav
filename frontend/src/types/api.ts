@@ -8,7 +8,9 @@
 
 export type Theme = 'light' | 'dark' | 'auto'
 export type IconType = 'none' | 'url' | 'upload' | 'auto' | 'favicon' | 'simple' | 'text'
-export type HomepageLayout = 'grid' | 'list'
+export type IconSource = 'manual' | 'link-icon' | 'apple-touch' | 'manifest' | 'favicon-ico' | 'brand-guess'
+export type IconStatus = 'ok' | 'failed'
+export type HomepageLayout = 'scroll' | 'tabs'
 export type ConflictStrategy = 'skip' | 'overwrite' | 'rename'
 
 export interface HealthResponse {
@@ -73,6 +75,11 @@ export interface Bookmark {
   sort_order: number
   is_visible: boolean
   open_in_new_tab: boolean
+  /** How an automatically fetched icon was obtained (absent when not fetched). */
+  icon_source?: IconSource
+  icon_status?: IconStatus
+  icon_error?: string
+  icon_checked_at?: string
   created_at?: string
   updated_at?: string
 }
@@ -147,6 +154,56 @@ export interface UploadResult {
 export interface IconRef {
   icon_type: IconType
   icon_value: string
+}
+
+/** Result of fetching an icon for one bookmark. */
+export interface IconFillOutcome {
+  bookmark?: Bookmark
+  ok: boolean
+  skipped?: boolean
+  icon_source?: IconSource
+  icon_error?: string
+}
+
+/** Icon coverage counts shown in the admin toolbar. */
+export interface IconSummary {
+  total: number
+  manual: number
+  auto: number
+  favicon: number
+  missing: number
+  failed: number
+  other?: number
+}
+
+export type IconJobStatus = 'running' | 'done' | 'canceled'
+
+export interface IconJobItem {
+  bookmark_id: number
+  title?: string
+  ok: boolean
+  icon_source?: IconSource
+  icon_error?: string
+}
+
+export interface IconJobSnapshot {
+  id: string
+  status: IconJobStatus
+  total: number
+  done: number
+  succeeded: number
+  failed: number
+  skipped: number
+  started_at: string
+  finished_at?: string
+  errors?: IconJobItem[]
+}
+
+export interface BulkIconRequest {
+  only_missing?: boolean
+  force?: boolean
+  limit?: number
+  refresh_days?: number
 }
 
 export interface Backup {

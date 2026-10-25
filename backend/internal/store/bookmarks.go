@@ -11,7 +11,9 @@ import (
 )
 
 const bookmarkColumns = `b.id, b.category_id, b.title, b.url, b.description, b.icon_type, b.icon_value,
-    b.keywords, b.tags, b.color, b.sort_order, b.is_visible, b.open_in_new_tab, b.created_at, b.updated_at`
+    b.keywords, b.tags, b.color, b.sort_order, b.is_visible, b.open_in_new_tab,
+    b.icon_source, b.icon_status, b.icon_error, b.icon_checked_at,
+    b.created_at, b.updated_at`
 
 // BookmarkFilter selects and paginates bookmarks.
 type BookmarkFilter struct {
@@ -227,10 +229,13 @@ func scanBookmark(sc scanner) (models.Bookmark, error) {
 	var (
 		b                                 models.Bookmark
 		desc, iconVal, kw, tags, color    sql.NullString
+		iconSrc, iconStat, iconErr, iconChk sql.NullString
 		visible, openNewTab               int
 	)
 	err := sc.Scan(&b.ID, &b.CategoryID, &b.Title, &b.URL, &desc, &b.IconType, &iconVal, &kw, &tags, &color,
-		&b.SortOrder, &visible, &openNewTab, &b.CreatedAt, &b.UpdatedAt)
+		&b.SortOrder, &visible, &openNewTab,
+		&iconSrc, &iconStat, &iconErr, &iconChk,
+		&b.CreatedAt, &b.UpdatedAt)
 	if err != nil {
 		return b, err
 	}
@@ -239,7 +244,144 @@ func scanBookmark(sc scanner) (models.Bookmark, error) {
 	b.Keywords = kw.String
 	b.Tags = tags.String
 	b.Color = color.String
+	b.IconSource = iconSrc.String
+	b.IconStatus = iconStat.String
+	b.IconError = iconErr.String
+	b.IconCheckedAt = iconChk.String
 	b.IsVisible = intToBool(visible)
 	b.OpenInNewTab = intToBool(openNewTab)
 	return b, nil
+}
+
+// IconBookkeeping is the automatic-icon state persisted on a bookmark.
+type IconBookkeeping struct {
+	IconType      string
+	IconValue     string
+	IconSource    string
+	IconStatus    string
+	IconError     string
+	IconCheckedAt string
+}
+
+// SetBookmarkIcon writes only the icon bookkeeping columns, so a background
+// fetch can never clobber a concurrent edit of the bookmark's other fields.
+func (s *Store) SetBookmarkIcon(ctx context.Context, id int64, in IconBookkeeping) (*models.Bookmark, error) {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE bookmarks SET icon_type = ?, icon_value = ?, icon_source = ?, icon_status = ?,
+            icon_error = ?, icon_checked_at = ?, updated_at = ?
+         WHERE id = ?`,
+		in.IconType, in.IconValue, in.IconSource, in.IconStatus,
+		in.IconError, in.IconCheckedAt, models.NowUTC(), id,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("set bookmark icon: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return nil, ErrNotFound
+	}
+	return s.GetBookmark(ctx, id)
+}
+
+// IconFillCandidate is a bookmark considered by the bulk icon job.
+type IconFillCandidate struct {
+	ID            int64
+	URL           string
+	IconType      string
+	IconValue     string
+	IconStatus    string
+	IconCheckedAt string
+}
+
+// ListIconFillCandidates returns bookmarks eligible for automatic icon filling.
+//
+// Manual icon types (url/upload/simple/text) are never returned: a user-set
+// icon must not be overwritten. When onlyMissing is true, bookmarks that were
+// checked recently and succeeded are skipped as well.
+func (s *Store) ListIconFillCandidates(ctx context.Context, onlyMissing bool, checkedAfter string, limit int) ([]IconFillCandidate, error) {
+	query := `SELECT b.id, b.url, b.icon_type, b.icon_value, b.icon_status, b.icon_checked_at
+        FROM bookmarks b
+        WHERE b.icon_type NOT IN ('url', 'upload', 'simple', 'text')`
+	args := []any{}
+	if onlyMissing {
+		query += ` AND (b.icon_status != 'ok' OR b.icon_checked_at = '' OR b.icon_checked_at < ?)`
+		args = append(args, checkedAfter)
+	}
+	query += ` ORDER BY b.category_id, b.sort_order, b.id`
+	if limit > 0 {
+		query += ` LIMIT ?`
+		args = append(args, limit)
+	}
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list icon candidates: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]IconFillCandidate, 0)
+	for rows.Next() {
+		var c IconFillCandidate
+		if err := rows.Scan(&c.ID, &c.URL, &c.IconType, &c.IconValue, &c.IconStatus, &c.IconCheckedAt); err != nil {
+			return nil, fmt.Errorf("scan icon candidate: %w", err)
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// IconSummary counts bookmarks by icon state for the admin dashboard.
+type IconSummary struct {
+	Total     int `json:"total"`
+	Manual    int `json:"manual"`
+	Auto      int `json:"auto"`
+	Favicon   int `json:"favicon"`
+	Missing   int `json:"missing"`
+	Failed    int `json:"failed"`
+	Other     int `json:"other"`
+}
+
+// CountIconSummary aggregates the icon state of every bookmark.
+func (s *Store) CountIconSummary(ctx context.Context) (IconSummary, error) {
+	var out IconSummary
+	rows, err := s.db.QueryContext(ctx, `SELECT icon_type, icon_status, COUNT(*) FROM bookmarks GROUP BY icon_type, icon_status`)
+	if err != nil {
+		return out, fmt.Errorf("count icon summary: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var iconType, status string
+		var n int
+		if err := rows.Scan(&iconType, &status, &n); err != nil {
+			return out, fmt.Errorf("scan icon summary: %w", err)
+		}
+		out.Total += n
+		switch iconType {
+		case "url", "upload", "simple", "text":
+			out.Manual += n
+		case "auto":
+			out.Auto += n
+			if status == models.IconStatusFailed {
+				out.Failed += n
+			}
+		case "favicon":
+			out.Favicon += n
+		case "none", "":
+			out.Missing += n
+		default:
+			out.Other += n
+		}
+	}
+	return out, rows.Err()
+}
+
+// CountBookmarksUsingUpload counts bookmarks whose icon_value points at the
+// given stored upload URL. Used to avoid deleting a shared cached icon.
+func (s *Store) CountBookmarksUsingUpload(ctx context.Context, iconValue string) (int, error) {
+	var n int
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM bookmarks WHERE icon_value = ?`, iconValue).Scan(&n); err != nil {
+		return 0, fmt.Errorf("count upload references: %w", err)
+	}
+	return n, nil
 }

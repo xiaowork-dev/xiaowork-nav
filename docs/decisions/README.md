@@ -9,6 +9,7 @@
 | [ADR-0003](ADR-0003-sqlite-migrations.md) | SQLite + 版本化迁移 + 升级前备份 | 已接受 |
 | [ADR-0004](ADR-0004-openapi-contract.md) | OpenAPI 作为前后端唯一契约 | 已接受 |
 | [ADR-0005](ADR-0005-db-info-inspection.md) | 部署脚本通过 `--db-info` 直接读取数据库状态 | 已接受 |
+| [ADR-0006](ADR-0006-icon-auto-fetch.md) | 服务端自动获取并缓存网站图标 | 已接受 |
 
 ## 模板
 

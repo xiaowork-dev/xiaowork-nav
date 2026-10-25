@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -102,7 +104,7 @@ func SafeHTTPClient(timeout time.Duration, maxRedirects int) *http.Client {
 			if len(via) >= maxRedirects {
 				return fmt.Errorf("ssrf: too many redirects")
 			}
-			if err := ValidateHTTPURL(req.URL.String()); err != nil {
+			if err := ValidateFetchURL(req.URL.String()); err != nil {
 				return fmt.Errorf("ssrf: unsafe redirect: %w", err)
 			}
 			return nil
@@ -120,5 +122,36 @@ func Fetch(ctx context.Context, client *http.Client, rawURL string) (*http.Respo
 		return nil, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("User-Agent", "XiaoWork-Nav/2.0 (+https://github.com/xiaowork-dev/xiaowork-nav)")
+	// Outbound fetches are icon/page retrievals: prefer images, then HTML.
+	req.Header.Set("Accept", "image/avif,image/webp,image/svg+xml,image/*;q=0.9,text/html;q=0.8,*/*;q=0.5")
 	return client.Do(req)
+}
+
+// ValidateFetchURL applies the stricter rules used for server-side icon
+// fetching on top of ValidateHTTPURL:
+//
+//   - credentials embedded in the URL (`user:pass@host`) are rejected, so a
+//     fetch can never be used to smuggle authentication;
+//   - a host is required and the URL must be absolute.
+//
+// Host-level restrictions (loopback, private, link-local, cloud metadata) are
+// enforced on the *resolved* address inside the dialer, which also covers DNS
+// rebinding; see SafeHTTPClient. The port is intentionally not restricted: the
+// requirement targets address ranges, and blocking legitimate non-standard
+// ports would break self-hosted sites for no additional safety.
+func ValidateFetchURL(raw string) error {
+	if err := ValidateHTTPURL(raw); err != nil {
+		return err
+	}
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return fmt.Errorf("%w: parse: %v", ErrInvalidURL, err)
+	}
+	if u.User != nil {
+		return fmt.Errorf("%w: credentials in the URL are not allowed", ErrInvalidURL)
+	}
+	if u.Hostname() == "" {
+		return fmt.Errorf("%w: missing host", ErrInvalidURL)
+	}
+	return nil
 }

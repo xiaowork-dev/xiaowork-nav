@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -33,8 +32,6 @@ const (
 
 var (
 	safeFilenamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
-	iconLinkPattern     = regexp.MustCompile(`(?is)<link[^>]+rel=["']?[^"'>]*icon[^"'>]*["']?[^>]*>`)
-	hrefPattern         = regexp.MustCompile(`(?is)href=["']([^"']+)["']`)
 )
 
 var allowedImageTypes = map[string]string{
@@ -65,6 +62,12 @@ func NewIconService(st *store.Store, uploadsDir string) *IconService {
 
 // SaveUpload validates and stores an uploaded icon file.
 func (i *IconService) SaveUpload(ctx context.Context, data []byte, originalName string) (*models.Upload, error) {
+	return i.saveUpload(ctx, data, originalName, "", models.UploadOriginManual)
+}
+
+// saveUpload validates and stores an icon, recording where it came from so that
+// auto-cached icons can be deduplicated and never mistaken for user uploads.
+func (i *IconService) saveUpload(ctx context.Context, data []byte, originalName, sourceURL, origin string) (*models.Upload, error) {
 	if len(data) == 0 {
 		return nil, Validation("validation_failed", "上传文件为空", FieldError{Field: "file", Issue: "文件为空"})
 	}
@@ -89,11 +92,16 @@ func (i *IconService) SaveUpload(ctx context.Context, data []byte, originalName 
 		return nil, fmt.Errorf("write icon: %w", err)
 	}
 
+	if origin == "" {
+		origin = models.UploadOriginManual
+	}
 	upload := &models.Upload{
 		Filename:     name,
 		OriginalName: truncate(filepath.Base(originalName), 255),
 		Mime:         mime,
 		Size:         int64(len(data)),
+		SourceURL:    sourceURL,
+		Origin:       origin,
 	}
 	if err := i.store.CreateUpload(ctx, upload); err != nil {
 		_ = os.Remove(filepath.Join(i.uploadsDir, name))
@@ -108,89 +116,55 @@ func UploadURL(filename string) string {
 }
 
 // Fetch downloads a site's favicon and stores it locally, returning the icon
-// reference to persist on a bookmark.
+// reference to persist on a bookmark. It is the synchronous, stateless entry
+// point used by the "fetch icon" admin action.
 func (i *IconService) Fetch(ctx context.Context, rawURL string) (string, string, error) {
-	if err := security.ValidateHTTPURL(rawURL); err != nil {
-		return "", "", New(KindUnsupported, "invalid_url_scheme", "URL 非法：仅允许 http/https",
-			FieldError{Field: "url", Issue: err.Error()})
-	}
-	pageURL, err := url.Parse(rawURL)
+	result, err := i.FetchIcon(ctx, rawURL, false)
 	if err != nil {
-		return "", "", New(KindUnsupported, "invalid_url_scheme", "URL 非法")
+		return "", "", err
 	}
-
-	candidates := []string{}
-	if iconURL := i.discoverIcon(ctx, pageURL); iconURL != "" {
-		candidates = append(candidates, iconURL)
-	}
-	candidates = append(candidates, pageURL.Scheme+"://"+pageURL.Host+"/favicon.ico")
-
-	var lastErr error
-	for _, candidate := range candidates {
-		data, _, err := i.download(ctx, candidate, MaxIconBytes)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		if _, _, ok := detectImageType(data, candidate); !ok {
-			lastErr = fmt.Errorf("not an image: %s", candidate)
-			continue
-		}
-		upload, err := i.SaveUpload(ctx, data, path.Base(candidate))
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		return "upload", UploadURL(upload.Filename), nil
-	}
-	if lastErr == nil {
-		lastErr = fmt.Errorf("no favicon found")
-	}
-	return "", "", New(KindNotFound, "not_found", "未能获取站点图标："+lastErr.Error())
+	return result.IconType, result.IconValue, nil
 }
 
-func (i *IconService) discoverIcon(ctx context.Context, pageURL *url.URL) string {
-	body, _, err := i.download(ctx, pageURL.String(), maxHTMLLength)
-	if err != nil {
-		return ""
-	}
-	matches := iconLinkPattern.FindAllString(string(body), -1)
-	for _, tag := range matches {
-		href := hrefPattern.FindStringSubmatch(tag)
-		if len(href) < 2 {
-			continue
-		}
-		ref, err := url.Parse(strings.TrimSpace(href[1]))
-		if err != nil {
-			continue
-		}
-		resolved := pageURL.ResolveReference(ref)
-		if err := security.ValidateHTTPURL(resolved.String()); err == nil {
-			return resolved.String()
-		}
-	}
-	return ""
-}
+// download fetches a URL with the per-candidate timeout applied.
+//
+// wantHTML relaxes the content-type guard for page/manifest retrieval; image
+// candidates reject an HTML response early instead of downloading a page.
+// allowTruncate keeps the first maxBytes of an oversized document instead of
+// failing: real home pages routinely exceed the discovery budget, and the icon
+// declarations always live in the document head.
+func (i *IconService) download(ctx context.Context, rawURL string, maxBytes int64, wantHTML, allowTruncate bool) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, iconCandidateTimeout)
+	defer cancel()
 
-func (i *IconService) download(ctx context.Context, rawURL string, maxBytes int64) ([]byte, string, error) {
 	resp, err := security.Fetch(ctx, i.client, rawURL)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, "", fmt.Errorf("unexpected status %d", resp.StatusCode)
+		return nil, fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
+	if !wantHTML {
+		contentType := strings.ToLower(strings.TrimSpace(resp.Header.Get("Content-Type")))
+		if strings.HasPrefix(contentType, "text/html") || strings.HasPrefix(contentType, "application/xhtml") {
+			return nil, fmt.Errorf("unexpected content type %q", contentType)
+		}
+	}
+
 	limited := io.LimitReader(resp.Body, maxBytes+1)
 	data, err := io.ReadAll(limited)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	if int64(len(data)) > maxBytes {
-		return nil, "", fmt.Errorf("response exceeds %d bytes", maxBytes)
+		if !allowTruncate {
+			return nil, fmt.Errorf("response exceeds %d bytes", maxBytes)
+		}
+		data = data[:maxBytes]
 	}
-	return data, resp.Header.Get("Content-Type"), nil
+	return data, nil
 }
 
 // Open returns a reader for a stored icon together with its MIME type.
@@ -216,6 +190,32 @@ func (i *IconService) DeleteUpload(ctx context.Context, filename string) error {
 	}
 	_ = os.Remove(filepath.Join(i.uploadsDir, filename))
 	return i.store.DeleteUpload(ctx, filename)
+}
+
+// DeleteAutoUploadIfUnreferenced removes a server-fetched icon only when it is
+// no longer referenced by any bookmark.
+//
+// User uploads are never removed, and a cached icon shared by several bookmarks
+// is kept: the requirement forbids cleaning up icons that are still in use.
+func (i *IconService) DeleteAutoUploadIfUnreferenced(ctx context.Context, iconValue string) error {
+	const prefix = UploadURLPrefix
+	if !strings.HasPrefix(iconValue, prefix) {
+		return nil
+	}
+	filename := strings.TrimPrefix(iconValue, prefix)
+	if !safeFilenamePattern.MatchString(filename) || strings.Contains(filename, "..") {
+		return nil
+	}
+
+	upload, err := i.store.GetUploadByFilename(ctx, filename)
+	if err != nil || upload.Origin != models.UploadOriginAuto {
+		return nil
+	}
+	refs, err := i.store.CountBookmarksUsingUpload(ctx, iconValue)
+	if err != nil || refs > 0 {
+		return nil
+	}
+	return i.DeleteUpload(ctx, filename)
 }
 
 // SaveDataURI decodes a `data:` URI image (percent-encoded or base64) and
@@ -299,14 +299,11 @@ func detectImageType(data []byte, name string) (mime, ext string, ok bool) {
 	if e, found := allowedImageTypes[sniffed]; found {
 		return sniffed, e, true
 	}
-	// SVG is not detected by content sniffing. Require an .svg name AND an
-	// actual <svg ...> root element, so an HTML document cannot masquerade as
-	// an icon.
-	if strings.EqualFold(filepath.Ext(name), ".svg") {
-		head := strings.ToLower(string(data[:min(len(data), 1024)]))
-		if strings.Contains(head, "<svg") {
-			return "image/svg+xml", ".svg", true
-		}
+	// SVG is not detected by content sniffing. Require an .svg name AND a real
+	// <svg> root element (and no HTML document markers), so an HTML page cannot
+	// masquerade as an icon.
+	if strings.EqualFold(filepath.Ext(name), ".svg") && looksLikeSVG(data) {
+		return "image/svg+xml", ".svg", true
 	}
 	return "", "", false
 }

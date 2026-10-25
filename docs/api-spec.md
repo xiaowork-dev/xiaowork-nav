@@ -171,7 +171,12 @@
 | GET | `/api/v1/admin/settings` | 读取全部设置 |
 | PUT | `/api/v1/admin/settings` | 批量更新设置 |
 | POST | `/api/v1/admin/uploads/icon` | 上传图标文件 |
-| POST | `/api/v1/admin/icons/fetch` | 服务端抓取站点图标（防 SSRF） |
+| POST | `/api/v1/admin/icons/fetch` | 服务端抓取站点图标（防 SSRF，返回引用不落库） |
+| GET | `/api/v1/admin/icons/summary` | 图标覆盖率统计 |
+| POST | `/api/v1/admin/icons/bulk` | 启动批量补全缺失图标（异步、单任务、限频） |
+| GET | `/api/v1/admin/icons/bulk` | 当前或最近一次批量任务状态（含进度与失败明细） |
+| POST | `/api/v1/admin/icons/bulk/cancel` | 取消正在运行的批量任务 |
+| POST | `/api/v1/admin/bookmarks/{id}/icon/auto` | 为单个网站自动获取并保存图标（`force` 可强制刷新） |
 | GET | `/api/v1/admin/export` | 导出 JSON（含版本号、校验） |
 | POST | `/api/v1/admin/import/preview` | 导入预览（冲突检测） |
 | POST | `/api/v1/admin/import` | 执行导入（冲突策略） |

@@ -69,18 +69,25 @@
 | title | TEXT | NOT NULL | 1–128 |
 | url | TEXT | NOT NULL | 仅 http/https，≤ 2048 |
 | description | TEXT | NOT NULL DEFAULT '' | ≤ 512 |
-| icon_type | TEXT | NOT NULL DEFAULT 'none' | `none`/`url`/`upload`/`auto` |
-| icon_value | TEXT | NOT NULL DEFAULT '' | 依类型，≤ 2048 |
+| icon_type | TEXT | NOT NULL DEFAULT 'none' | `none`/`url`/`upload`/`auto`/`favicon`/`simple`/`text` |
+| icon_value | TEXT | NOT NULL DEFAULT '' | 依类型，≤ 2048；`auto` 存站内缓存路径 |
 | keywords | TEXT | NOT NULL DEFAULT '' | ≤ 512，逗号分隔 |
+| tags | TEXT | NOT NULL DEFAULT '' | ≤ 256（迁移 0002） |
+| color | TEXT | NOT NULL DEFAULT '' | #RGB / #RRGGBB（迁移 0002） |
 | sort_order | INTEGER | NOT NULL DEFAULT 0 | 分类内升序 |
 | is_visible | INTEGER | NOT NULL DEFAULT 1 | |
 | open_in_new_tab | INTEGER | NOT NULL DEFAULT 1 | |
+| icon_source | TEXT | NOT NULL DEFAULT '' | 自动图标来源：`manual`/`link-icon`/`apple-touch`/`manifest`/`favicon-ico`/`brand-guess`（迁移 0003） |
+| icon_status | TEXT | NOT NULL DEFAULT '' | 最近一次自动获取结果：`ok`/`failed`（迁移 0003） |
+| icon_error | TEXT | NOT NULL DEFAULT '' | 最近一次失败原因（迁移 0003） |
+| icon_checked_at | TEXT | NOT NULL DEFAULT '' | 最近一次自动获取时间，用于刷新策略（迁移 0003） |
 | created_at | TEXT | NOT NULL | |
 | updated_at | TEXT | NOT NULL | |
 
-索引：`idx_bookmarks_category_id`、`idx_bookmarks_sort_order`、`idx_bookmarks_is_visible`。
+索引：`idx_bookmarks_category_id`、`idx_bookmarks_sort_order`、`idx_bookmarks_is_visible`、`idx_bookmarks_icon_status`。
 
 > 删除分类时级联删除其导航项；接口层需在删除前给出影响数量确认（见 `api-spec.md` 6.2）。
+> `icon_type` 为 `url`/`upload`/`simple`/`text` 时属于**用户手动设置**，自动图标流程永不覆盖。
 
 ### 2.5 `site_settings`
 
@@ -101,9 +108,14 @@
 | original_name | TEXT | | 原始文件名 |
 | mime | TEXT | NOT NULL | |
 | size | INTEGER | NOT NULL | 字节 |
+| source_url | TEXT | NOT NULL DEFAULT '' | 自动抓取的来源 URL；手动上传为空（迁移 0003） |
+| origin | TEXT | NOT NULL DEFAULT 'manual' | `manual`（用户上传）/ `auto`（服务端缓存）（迁移 0003） |
 | created_at | TEXT | NOT NULL | |
 
+索引：`idx_uploads_source_url`（按来源去重复用缓存）。
+
 > 文件实体存 `/data/uploads`；数据库仅存元数据，便于导出与清理。
+> `origin=auto` 的缓存文件只在"替换后无任何网站引用"时才被清理；`manual` 文件永不自动删除。
 
 ### 2.7 `schema_migrations`
 
@@ -145,11 +157,17 @@ schema_migrations (迁移记录)
 backend/internal/migrations/
 ├── 0001_init.up.sql
 ├── 0001_init.down.sql
-├── 0002_add_sessions.up.sql
-└── 0002_add_sessions.down.sql
+├── 0002_icons_and_labels.up.sql
+├── 0002_icons_and_labels.down.sql
+├── 0003_icon_metadata.up.sql
+└── 0003_icon_metadata.down.sql
 ```
 
-`0001_init.up.sql` 覆盖 2.1–2.7 全部表与索引。
+| 版本 | 名称 | 内容 |
+| --- | --- | --- |
+| 0001 | `init` | 2.1–2.7 全部表与索引 |
+| 0002 | `icons_and_labels` | `categories.icon/color`、`bookmarks.color/tags` |
+| 0003 | `icon_metadata` | 自动图标元数据（见 §2.4、§2.6）与两个索引 |
 
 ### 4.3 规则
 

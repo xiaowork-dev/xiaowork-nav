@@ -60,8 +60,24 @@ func Defaults() models.Settings {
 		},
 		DefaultSearchEngine: "Google",
 		OpenInNewTabDefault: true,
-		HomepageLayout:      "grid",
+		HomepageLayout:      "scroll",
 		AllowGuestAccess:    true,
+	}
+}
+
+// normalizeHomepageLayout maps legacy values onto the V2.1 names.
+//
+// V2.0 stored `grid`/`list` for a setting the public page never read; V2.1
+// replaces them with the two real navigation layouts. Normalising on read
+// keeps existing databases working without rewriting user data.
+func normalizeHomepageLayout(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "grid", "scroll":
+		return "scroll"
+	case "list", "tabs":
+		return "tabs"
+	default:
+		return value
 	}
 }
 
@@ -77,6 +93,7 @@ func (s *SettingsService) Get(ctx context.Context) (models.Settings, error) {
 			return models.Settings{}, fmt.Errorf("apply setting %q: %w", key, err)
 		}
 	}
+	settings.HomepageLayout = normalizeHomepageLayout(settings.HomepageLayout)
 	return settings, nil
 }
 
@@ -157,7 +174,11 @@ func applySetting(settings *models.Settings, key, raw string) error {
 	case keyOpenInNewTabDefault:
 		return json.Unmarshal([]byte(raw), &settings.OpenInNewTabDefault)
 	case keyHomepageLayout:
-		return json.Unmarshal([]byte(raw), &settings.HomepageLayout)
+		if err := json.Unmarshal([]byte(raw), &settings.HomepageLayout); err != nil {
+			return err
+		}
+		settings.HomepageLayout = normalizeHomepageLayout(settings.HomepageLayout)
+		return nil
 	case keyAllowGuestAccess:
 		return json.Unmarshal([]byte(raw), &settings.AllowGuestAccess)
 	default:
@@ -181,10 +202,10 @@ func validateSettings(s models.Settings) error {
 			FieldError{Field: keyTheme, Issue: "仅允许 light/dark/auto"})
 	}
 	switch s.HomepageLayout {
-	case "grid", "list":
+	case "scroll", "tabs":
 	default:
-		return Validation("validation_failed", "首页布局取值非法",
-			FieldError{Field: keyHomepageLayout, Issue: "仅允许 grid/list"})
+		return Validation("validation_failed", "导航布局取值非法",
+			FieldError{Field: keyHomepageLayout, Issue: "仅允许 scroll/tabs"})
 	}
 	if s.SiteFavicon != "" && !isAssetRef(s.SiteFavicon) {
 		return Validation("validation_failed", "Favicon 地址非法",

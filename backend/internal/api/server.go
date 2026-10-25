@@ -36,6 +36,7 @@ type Server struct {
 	settings *service.SettingsService
 	catalog  *service.CatalogService
 	icons    *service.IconService
+	iconFill *service.IconFillService
 	transfer *service.TransferService
 	backup   *service.BackupService
 }
@@ -45,6 +46,7 @@ func New(deps Deps) *Server {
 	st := store.New(deps.DB)
 	settings := service.NewSettingsService(st)
 	icons := service.NewIconService(st, deps.Config.UploadsDir)
+	catalog := service.NewCatalogService(st, settings)
 	return &Server{
 		cfg:      deps.Config,
 		db:       deps.DB,
@@ -53,8 +55,9 @@ func New(deps Deps) *Server {
 		store:    st,
 		auth:     service.NewAuthService(st, deps.Config),
 		settings: settings,
-		catalog:  service.NewCatalogService(st, settings),
+		catalog:  catalog,
 		icons:    icons,
+		iconFill: service.NewIconFillService(icons, st, catalog),
 		transfer: service.NewTransferService(st, icons),
 		backup:   service.NewBackupService(deps.DB, deps.Config.BackupsDir, deps.Config.UploadsDir, version.Version, deps.Config.BackupKeep),
 	}

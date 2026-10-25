@@ -613,6 +613,126 @@ paths:
         '422': { $ref: '#/components/responses/Unprocessable' }
         default: { $ref: '#/components/responses/Error' }
 
+  /admin/icons/summary:
+    get:
+      tags: [admin]
+      operationId: getIconSummary
+      summary: 图标覆盖率统计
+      responses:
+        '200':
+          description: 统计结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IconSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/icons/bulk:
+    post:
+      tags: [admin]
+      operationId: startBulkIconFetch
+      summary: 批量补全缺失图标（异步、单任务、限频）
+      description: |
+        只处理没有手动图标的网站（`icon_type` 为 `none` / `auto` / `favicon`）；
+        `url` / `upload` / `simple` / `text` 等用户设置的图标永远不会被覆盖。
+        同一时间只允许一个任务，重复启动返回 409。
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BulkIconRequest' }
+      responses:
+        '202':
+          description: 任务已启动（候选为空时立即以 done 返回）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job: { $ref: '#/components/schemas/IconJobSnapshot' }
+                required: [job]
+        '409': { $ref: '#/components/responses/Conflict' }
+        default: { $ref: '#/components/responses/Error' }
+    get:
+      tags: [admin]
+      operationId: getBulkIconStatus
+      summary: 当前或最近一次批量任务状态
+      responses:
+        '200':
+          description: 任务快照；从未运行过时 `job` 为 null
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job:
+                    oneOf:
+                      - $ref: '#/components/schemas/IconJobSnapshot'
+                      - type: 'null'
+                required: [job]
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/icons/bulk/cancel:
+    post:
+      tags: [admin]
+      operationId: cancelBulkIconFetch
+      summary: 取消正在运行的批量任务
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          description: 取消结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  canceled: { type: boolean }
+                  job:
+                    oneOf:
+                      - $ref: '#/components/schemas/IconJobSnapshot'
+                      - type: 'null'
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/bookmarks/{id}/icon/auto:
+    post:
+      tags: [admin]
+      operationId: autoBookmarkIcon
+      summary: 为单个网站自动获取并保存图标
+      description: |
+        抓取失败不会改变网站已有的图标：响应仍为 200，`ok=false` 并给出失败原因，
+        便于后台直接展示。手动设置图标的网站会被跳过（`skipped=true`）。
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+        - name: force
+          in: query
+          required: false
+          schema: { type: boolean, default: false }
+          description: 忽略本地缓存重新抓取（也可通过请求体 force 字段指定）
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force: { type: boolean, default: false }
+      responses:
+        '200':
+          description: 抓取结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IconFillOutcome' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        default: { $ref: '#/components/responses/Error' }
+
   /admin/export:
     get:
       tags: [admin]
@@ -966,13 +1086,25 @@ components:
         description: { type: string }
         icon_type:
           type: string
-          enum: [none, url, upload, auto]
-          description: none=无 / url=远程地址 / upload=本地上传 / auto=服务端抓取
+          enum: [none, url, upload, auto, favicon, simple, text]
+          description: none=无 / url=远程地址 / upload=本地上传 / auto=服务端自动获取 / favicon=站点图标 / simple=Simple Icons / text=文字图标
         icon_value: { type: string }
         keywords: { type: string }
+        tags: { type: string }
+        color: { type: string }
         sort_order: { type: integer }
         is_visible: { type: boolean, description: 'false = 私有，仅管理员可见' }
         open_in_new_tab: { type: boolean }
+        icon_source:
+          type: string
+          description: 自动图标的来源（仅在自动获取过时返回）
+          enum: [manual, link-icon, apple-touch, manifest, favicon-ico, brand-guess]
+        icon_status:
+          type: string
+          description: 最近一次自动获取的结果
+          enum: [ok, failed]
+        icon_error: { type: string, description: 最近一次自动获取失败的原因 }
+        icon_checked_at: { type: string, format: date-time }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
       required: [id, category_id, title, url, sort_order, is_visible, open_in_new_tab]
@@ -984,9 +1116,11 @@ components:
         title: { type: string, minLength: 1, maxLength: 128 }
         url: { type: string, format: uri, maxLength: 2048 }
         description: { type: string, maxLength: 512 }
-        icon_type: { type: string, enum: [none, url, upload, auto] }
+        icon_type: { type: string, enum: [none, url, upload, auto, favicon, simple, text] }
         icon_value: { type: string, maxLength: 2048 }
         keywords: { type: string, maxLength: 512 }
+        tags: { type: string, maxLength: 256 }
+        color: { type: string }
         sort_order: { type: integer }
         is_visible: { type: boolean }
         open_in_new_tab: { type: boolean }
@@ -999,9 +1133,11 @@ components:
         title: { type: string, minLength: 1, maxLength: 128 }
         url: { type: string, format: uri, maxLength: 2048 }
         description: { type: string, maxLength: 512 }
-        icon_type: { type: string, enum: [none, url, upload, auto] }
+        icon_type: { type: string, enum: [none, url, upload, auto, favicon, simple, text] }
         icon_value: { type: string, maxLength: 2048 }
         keywords: { type: string, maxLength: 512 }
+        tags: { type: string, maxLength: 256 }
+        color: { type: string }
         sort_order: { type: integer }
         is_visible: { type: boolean }
         open_in_new_tab: { type: boolean }
@@ -1053,7 +1189,10 @@ components:
           items: { $ref: '#/components/schemas/SearchEngine' }
         default_search_engine: { type: string }
         open_in_new_tab_default: { type: boolean }
-        homepage_layout: { type: string, enum: [grid, list] }
+        homepage_layout:
+          type: string
+          enum: [scroll, tabs]
+          description: 新访客的默认导航布局；访客在页面上的本地选择优先（旧值 grid/list 读取时归一化为 scroll/tabs）
 
     AdminSettings:
       allOf:
@@ -1102,9 +1241,88 @@ components:
     IconRef:
       type: object
       properties:
-        icon_type: { type: string, enum: [url, upload, auto, none] }
+        icon_type: { type: string, enum: [url, upload, auto, favicon, simple, text, none] }
         icon_value: { type: string }
       required: [icon_type, icon_value]
+
+    BulkIconRequest:
+      type: object
+      description: '批量补全参数；请求体省略时等价于 { only_missing: true }。'
+      properties:
+        only_missing:
+          type: boolean
+          default: true
+          description: 只处理缺失/失败/超过刷新周期的网站
+        force:
+          type: boolean
+          default: false
+          description: 忽略本地缓存重新抓取
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 2000
+          default: 500
+          description: 本次最多处理多少个网站
+        refresh_days:
+          type: integer
+          minimum: 1
+          default: 30
+          description: only_missing 模式下，成功抓取多少天后才重新抓取
+
+    IconFillOutcome:
+      type: object
+      description: |
+        单个网站的自动图标结果。抓取失败时 `ok=false` 且带 `icon_error`，
+        网站原图标保持不变；手动图标的网站返回 `skipped=true`。
+      properties:
+        bookmark: { $ref: '#/components/schemas/Bookmark' }
+        ok: { type: boolean }
+        skipped: { type: boolean }
+        icon_source:
+          type: string
+          enum: [manual, link-icon, apple-touch, manifest, favicon-ico, brand-guess]
+        icon_error: { type: string }
+      required: [ok]
+
+    IconJobItem:
+      type: object
+      properties:
+        bookmark_id: { type: integer, format: int64 }
+        title: { type: string }
+        ok: { type: boolean }
+        icon_source: { type: string }
+        icon_error: { type: string }
+      required: [bookmark_id, ok]
+
+    IconJobSnapshot:
+      type: object
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [running, done, canceled] }
+        total: { type: integer }
+        done: { type: integer }
+        succeeded: { type: integer }
+        failed: { type: integer }
+        skipped: { type: integer }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time }
+        errors:
+          type: array
+          description: 最多保留 50 条失败明细
+          items: { $ref: '#/components/schemas/IconJobItem' }
+      required: [id, status, total, done]
+
+    IconSummary:
+      type: object
+      properties:
+        total: { type: integer }
+        manual: { type: integer, description: 用户手动设置（url/upload/simple/text） }
+        auto: { type: integer, description: 自动获取（auto） }
+        favicon: { type: integer, description: 使用站点图标策略（favicon） }
+        missing: { type: integer, description: 无图标（none） }
+        failed: { type: integer, description: 最近一次自动获取失败 }
+        other: { type: integer }
+      required: [total, manual, auto, favicon, missing, failed]
 
     ExportBundle:
       type: object

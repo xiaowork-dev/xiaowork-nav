@@ -54,22 +54,29 @@ type Category struct {
 // Bookmark is a navigation entry.
 //
 // IconType values: none | url | upload | auto | favicon | simple | text.
+//
+// The Icon* bookkeeping fields are only meaningful for automatically fetched
+// icons; they are omitted from JSON when empty so public payloads stay small.
 type Bookmark struct {
-	ID           int64  `json:"id"`
-	CategoryID   int64  `json:"category_id"`
-	Title        string `json:"title"`
-	URL          string `json:"url"`
-	Description  string `json:"description"`
-	IconType     string `json:"icon_type"`
-	IconValue    string `json:"icon_value"`
-	Keywords     string `json:"keywords"`
-	Tags         string `json:"tags"`
-	Color        string `json:"color"`
-	SortOrder    int    `json:"sort_order"`
-	IsVisible    bool   `json:"is_visible"`
-	OpenInNewTab bool   `json:"open_in_new_tab"`
-	CreatedAt    string `json:"created_at"`
-	UpdatedAt    string `json:"updated_at"`
+	ID            int64  `json:"id"`
+	CategoryID    int64  `json:"category_id"`
+	Title         string `json:"title"`
+	URL           string `json:"url"`
+	Description   string `json:"description"`
+	IconType      string `json:"icon_type"`
+	IconValue     string `json:"icon_value"`
+	Keywords      string `json:"keywords"`
+	Tags          string `json:"tags"`
+	Color         string `json:"color"`
+	SortOrder     int    `json:"sort_order"`
+	IsVisible     bool   `json:"is_visible"`
+	OpenInNewTab  bool   `json:"open_in_new_tab"`
+	IconSource    string `json:"icon_source,omitempty"`
+	IconStatus    string `json:"icon_status,omitempty"`
+	IconError     string `json:"icon_error,omitempty"`
+	IconCheckedAt string `json:"icon_checked_at,omitempty"`
+	CreatedAt     string `json:"created_at"`
+	UpdatedAt     string `json:"updated_at"`
 }
 
 // SearchEngine is a configurable search provider.
@@ -110,14 +117,42 @@ type Navigation struct {
 }
 
 // Upload is metadata for an uploaded icon file.
+//
+// Origin is "manual" for user uploads and "auto" for icons the server fetched
+// and cached; SourceURL records where an auto-cached icon came from so that
+// repeated fetches can reuse the same file.
 type Upload struct {
 	ID           int64  `json:"id"`
 	Filename     string `json:"filename"`
 	OriginalName string `json:"original_name"`
 	Mime         string `json:"mime"`
 	Size         int64  `json:"size"`
+	SourceURL    string `json:"source_url,omitempty"`
+	Origin       string `json:"origin,omitempty"`
 	CreatedAt    string `json:"created_at"`
 }
+
+// Origin values for Upload.Origin.
+const (
+	UploadOriginManual = "manual"
+	UploadOriginAuto   = "auto"
+)
+
+// Icon source values recorded on Bookmark.IconSource.
+const (
+	IconSourceManual     = "manual"
+	IconSourceLinkIcon   = "link-icon"
+	IconSourceAppleTouch = "apple-touch"
+	IconSourceManifest   = "manifest"
+	IconSourceFaviconICO = "favicon-ico"
+	IconSourceBrandGuess = "brand-guess"
+)
+
+// IconStatus values recorded on Bookmark.IconStatus.
+const (
+	IconStatusOK     = "ok"
+	IconStatusFailed = "failed"
+)
 
 // Backup describes a database snapshot on disk.
 type Backup struct {

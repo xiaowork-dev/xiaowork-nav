@@ -589,9 +589,15 @@ func validateIcon(iconType, iconValue string) (string, string, error) {
 	}
 
 	switch iconType {
-	case "none", "auto", "favicon":
+	case "none", "favicon":
 		// These types carry no stored value.
 		iconValue = ""
+	case "auto":
+		// Automatically fetched icons store a cached, site-relative upload path.
+		// An empty value simply means "nothing fetched yet".
+		if iconValue != "" && !strings.HasPrefix(iconValue, "/") {
+			return "", "", fieldErr("icon_value", "自动获取的图标必须是站内路径")
+		}
 	case "url":
 		if iconValue == "" {
 			return "", "", fieldErr("icon_value", "图标 URL 不能为空")

@@ -56,10 +56,12 @@ const iconValueEditable = computed(() =>
 )
 
 // Types that carry no value; keep the field consistent with the backend.
+// `auto` is intentionally not cleared: a fetched icon is stored as a
+// site-relative upload path and must survive an edit of the bookmark.
 watch(
   () => form.icon_type,
   (type) => {
-    if (type === 'none' || type === 'auto' || type === 'favicon') {
+    if (type === 'none' || type === 'favicon') {
       form.icon_value = ''
     }
   },
@@ -206,6 +208,7 @@ async function submit(): Promise<void> {
         <label for="bm-icon-type">图标类型</label>
         <select id="bm-icon-type" v-model="form.icon_type" class="select">
           <option value="none">无图标（自动尝试站点 Favicon，再退回首字母）</option>
+          <option value="auto">自动获取（服务端抓取并缓存）</option>
           <option value="url">图片地址</option>
           <option value="upload">本地上传</option>
           <option value="simple">Simple Icons 标识</option>
@@ -233,6 +236,10 @@ async function submit(): Promise<void> {
         <span class="hint">
           当前类型：{{ form.icon_type }}
           <template v-if="form.icon_type === 'simple'">（仅接受已验证的 Simple Icons 标识）</template>
+        </span>
+        <span v-if="form.icon_type === 'auto'" class="hint">
+          保存后可在网站列表中点「自动获取」立即抓取，或使用列表上方的「批量补全缺失图标」。
+          自动获取不会覆盖你手动设置的图标。
         </span>
       </div>
 

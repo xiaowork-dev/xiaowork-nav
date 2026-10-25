@@ -3,8 +3,12 @@ import { api } from './client'
 import type {
   AdminSettings,
   Backup,
+  BulkIconRequest,
   ExportBundle,
+  IconFillOutcome,
+  IconJobSnapshot,
   IconRef,
+  IconSummary,
   ImportPreview,
   ImportResult,
   UpdateInfo,
@@ -27,6 +31,28 @@ export function uploadIcon(file: File): Promise<UploadResult> {
 
 export function fetchIcon(url: string): Promise<IconRef> {
   return api.post<IconRef>('/api/v1/admin/icons/fetch', { url })
+}
+
+/** Fetches and stores an icon for an existing bookmark. */
+export function autoBookmarkIcon(bookmarkId: number, force = false): Promise<IconFillOutcome> {
+  return api.post<IconFillOutcome>(`/api/v1/admin/bookmarks/${bookmarkId}/icon/auto`, { force })
+}
+
+export function getIconSummary(): Promise<IconSummary> {
+  return api.get<IconSummary>('/api/v1/admin/icons/summary')
+}
+
+/** Starts the bulk icon completion job (only one may run at a time). */
+export function startBulkIconFetch(payload: BulkIconRequest = {}): Promise<{ job: IconJobSnapshot }> {
+  return api.post<{ job: IconJobSnapshot }>('/api/v1/admin/icons/bulk', payload)
+}
+
+export function getBulkIconStatus(): Promise<{ job: IconJobSnapshot | null }> {
+  return api.get<{ job: IconJobSnapshot | null }>('/api/v1/admin/icons/bulk')
+}
+
+export function cancelBulkIconFetch(): Promise<{ canceled: boolean; job: IconJobSnapshot | null }> {
+  return api.post<{ canceled: boolean; job: IconJobSnapshot | null }>('/api/v1/admin/icons/bulk/cancel')
 }
 
 export function exportData(): Promise<ExportBundle> {

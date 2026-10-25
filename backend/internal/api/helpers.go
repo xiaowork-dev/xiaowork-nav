@@ -42,6 +42,23 @@ func decodeRawJSON(w http.ResponseWriter, r *http.Request) (map[string]json.RawM
 	return patch, nil
 }
 
+// decodeOptionalJSON is decodeJSON for requests whose body may be absent.
+// An empty body leaves dst untouched and is not an error.
+func decodeOptionalJSON(w http.ResponseWriter, r *http.Request, dst any) error {
+	if r.Body == nil || r.ContentLength == 0 {
+		return nil
+	}
+	err := decodeJSON(w, r, dst)
+	if err == nil {
+		return nil
+	}
+	// A whitespace-only body is treated as empty.
+	if apiErr, ok := err.(*APIError); ok && apiErr.Message == "请求体不能为空" {
+		return nil
+	}
+	return err
+}
+
 // pathID reads the {id} path parameter as an int64.
 func pathID(r *http.Request) (int64, error) {
 	raw := r.PathValue("id")

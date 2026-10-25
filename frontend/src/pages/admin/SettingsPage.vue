@@ -21,7 +21,7 @@ const form = reactive<AdminSettings>({
   search_engines: [],
   default_search_engine: '',
   open_in_new_tab_default: true,
-  homepage_layout: 'grid',
+  homepage_layout: 'scroll',
   allow_guest_access: true,
 })
 
@@ -133,11 +133,12 @@ onMounted(load)
       </div>
 
       <div class="field">
-        <label for="s-layout">首页布局</label>
+        <label for="s-layout">默认导航布局</label>
         <select id="s-layout" v-model="form.homepage_layout" class="select">
-          <option value="grid">网格</option>
-          <option value="list">列表</option>
+          <option value="scroll">滚动模式（左侧分类栏 + 纵向分类列表）</option>
+          <option value="tabs">标签模式（顶部分类标签 + 居中搜索）</option>
         </select>
+        <span class="hint">访客在页面上切换布局后，会以本地偏好为准；该设置是新访客的默认值。</span>
       </div>
 
       <label class="checkbox" style="margin-bottom: 12px">
