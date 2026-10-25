@@ -21,6 +21,9 @@
 #  11. restore.sh refuses to start when the snapshot version is unknown
 #  12. an NPM-style deployment (external network, no host port) rolls back and
 #      is verified after a failed upgrade
+#  13. upgrading from the released v2.0.1 advances the schema while keeping the
+#      data, the manual SVG icon and the upload metadata
+#  14. an unwritable data directory fails fast with actionable guidance
 #
 # Usage: ./scripts/tests/deploy-faults.test.sh
 #   XN_TEST_GOPROXY  Go module proxy for the image builds (default: upstream)
@@ -38,12 +41,16 @@ WORK_ROOT="${TMPDIR:-/tmp}/xiaowork-nav-deploy-tests"
 
 PORT="${XN_TEST_PORT:-18999}"
 DATA_DIR="${WORK_ROOT}/data"
+# Keep in sync with backend/internal/migrations/sql (highest NNNN_*.up.sql).
+EXPECTED_SCHEMA=3
 # Docker needs a host path it understands; on Windows (Git Bash) that means a
 # C:/... style path rather than the MSYS /tmp/... view.
 if command -v cygpath >/dev/null 2>&1; then
   DATA_DIR_HOST="$(cygpath -m "${DATA_DIR}")"
+  WORK_ROOT_HOST="$(cygpath -m "${WORK_ROOT}")"
 else
   DATA_DIR_HOST="${DATA_DIR}"
+  WORK_ROOT_HOST="${WORK_ROOT}"
 fi
 BACKUP_DIR="$(dirname "${DATA_DIR_HOST}")/xiaowork-nav-backups"
 
@@ -87,7 +94,7 @@ assert_not_eq() {
 cleanup() {
   compose down -v >/dev/null 2>&1 || true
   docker network rm "${NPM_TEST_NETWORK}" >/dev/null 2>&1 || true
-  for img in xiaowork-nav:v2.0.0 xiaowork-nav:v2.0.1 xiaowork-nav:v2.0.2 \
+  for img in xiaowork-nav:v2.0.0 xiaowork-nav:v2.0.1 xiaowork-nav:v2.0.1-old xiaowork-nav:v2.0.2 \
              xiaowork-nav:test-broken xiaowork-nav:latest; do
     docker rmi "$img" >/dev/null 2>&1 || true
   done
@@ -190,6 +197,15 @@ YAML
 # shellcheck source=scripts/lib.sh
 source "${ROOT_DIR}/scripts/lib.sh"
 
+base_url="http://127.0.0.1:${PORT}"
+
+# login_cookie logs in as the seeded administrator and prints the session cookie.
+login_cookie() {
+  curl -fsS -i -X POST "${base_url}/api/v1/auth/login" -H 'Content-Type: application/json' \
+    -d '{"username":"admin","password":"deploy-test-pass"}' \
+    | tr -d '\r' | sed -n 's/^[Ss]et-[Cc]ookie: \([^;]*\).*/\1/p' | head -1
+}
+
 wait_http() { # <timeout seconds>
   local deadline=$((SECONDS + $1))
   while [[ ${SECONDS} -lt ${deadline} ]]; do
@@ -205,16 +221,14 @@ ensure_seeded() {
   cats="$(db_field categories 2>/dev/null || echo 0)"
   if [[ "${cats}" =~ ^[0-9]+$ ]] && [[ "${cats}" -ge 1 ]]; then return 0; fi
 
-  local base="http://127.0.0.1:${PORT}" cookie
-  curl -fsS -X POST "${base}/api/v1/setup" -H 'Content-Type: application/json' \
-    -d '{"username":"admin","password":"deploy-test-pass"}' >/dev/null
-  cookie="$(curl -fsS -i -X POST "${base}/api/v1/auth/login" -H 'Content-Type: application/json' \
-    -d '{"username":"admin","password":"deploy-test-pass"}' \
-    | tr -d '\r' | sed -n 's/^[Ss]et-[Cc]ookie: \([^;]*\).*/\1/p' | head -1)"
+  local cookie
+  curl -fsS -X POST "${base_url}/api/v1/setup" -H 'Content-Type: application/json' \
+    -d '{"username":"admin","password":"deploy-test-pass"}' >/dev/null 2>&1 || true
+  cookie="$(login_cookie)"
   [[ -n "${cookie}" ]] || { bad "could not log in to seed data"; return 1; }
-  curl -fsS -X POST "${base}/api/v1/admin/categories" -H 'Content-Type: application/json' \
+  curl -fsS -X POST "${base_url}/api/v1/admin/categories" -H 'Content-Type: application/json' \
     -H "Cookie: ${cookie}" -d '{"name":"Seed"}' >/dev/null
-  curl -fsS -X POST "${base}/api/v1/admin/bookmarks" -H 'Content-Type: application/json' \
+  curl -fsS -X POST "${base_url}/api/v1/admin/bookmarks" -H 'Content-Type: application/json' \
     -H "Cookie: ${cookie}" \
     -d '{"category_id":1,"title":"Seed Site","url":"https://example.com/"}' >/dev/null
   ok "seeded one category and one bookmark"
@@ -252,6 +266,19 @@ SQL
     --build-arg VERSION=v2.0.2 --build-arg COMMIT=testmig --build-arg BUILD_TIME=test \
     -t xiaowork-nav:v2.0.2 "${copy}" >/dev/null
 
+  # The previously released version, built from its own git tag, so the upgrade
+  # scenario really starts on the old schema instead of a relabelled new build.
+  local old="${WORK_ROOT}/repo-v2.0.1"
+  mkdir -p "${old}"
+  if git -C "${ROOT_DIR}" rev-parse -q --verify "refs/tags/v2.0.1" >/dev/null 2>&1; then
+    git -C "${ROOT_DIR}" archive v2.0.1 | tar -C "${old}" -xf -
+    docker build --build-arg "GOPROXY=${goproxy}" \
+      --build-arg VERSION=v2.0.1 --build-arg COMMIT=release201 --build-arg BUILD_TIME=test \
+      -t xiaowork-nav:v2.0.1-old "${old}" >/dev/null
+  else
+    warn "git tag v2.0.1 not found; skipping the released-version image"
+  fi
+
   # An image that cannot start at all (and cannot report the database version).
   docker build -t xiaowork-nav:test-broken - <<'DOCKER' >/dev/null
 FROM alpine:3.20
@@ -283,7 +310,7 @@ scenario_db_inspection() {
   printf '  image:    %s\n' "$(image_ref)"
   printf '  db_info:  %s\n' "$(printf '%s' "${raw}" | tr '\n' ' ')"
   assert_contains "${raw}" "exists=true" "db_info reports an existing database"
-  assert_eq "$(db_field schema_version 2>/dev/null || true)" "2" "schema version read from the file"
+  assert_eq "$(db_field schema_version 2>/dev/null || true)" "${EXPECTED_SCHEMA}" "schema version read from the file"
 }
 
 scenario_pinned_noop() {
@@ -346,7 +373,7 @@ scenario_start_failure() {
   assert_contains "${out}" "update failed" "detects the failure"
   assert_contains "${out}" "rollback verified" "verifies the rollback"
   assert_eq "$(get_env APP_VERSION)" "v2.0.0" "APP_VERSION restored"
-  assert_eq "$(db_field schema_version)" "2" "schema unchanged"
+  assert_eq "$(db_field schema_version)" "${EXPECTED_SCHEMA}" "schema unchanged"
   assert_eq "$(db_field bookmarks)" "1" "data intact"
   dump "${out}"
 }
@@ -381,7 +408,7 @@ scenario_unknown_db_version() {
   assert_contains "${out}" "cannot determine the database schema version" "takes the fail-safe path"
   assert_contains "${out}" "rollback verified" "verifies the rollback"
   assert_eq "$(get_env APP_VERSION)" "v2.0.0" "APP_VERSION restored"
-  assert_eq "$(db_field schema_version)" "2" "schema intact"
+  assert_eq "$(db_field schema_version)" "${EXPECTED_SCHEMA}" "schema intact"
   assert_eq "$(db_field bookmarks)" "1" "data intact"
   dump "${out}"
 }
@@ -391,7 +418,7 @@ scenario_schema_readable_while_stopped() {
   baseline_up v2.0.0 || return
 
   compose stop app >/dev/null
-  assert_eq "$(schema_version 2>/dev/null || true)" "2" "schema read from the database file with the app stopped"
+  assert_eq "$(schema_version 2>/dev/null || true)" "${EXPECTED_SCHEMA}" "schema read from the database file with the app stopped"
   assert_not_eq "$(db_field categories 2>/dev/null || true)" "" "row counts also readable while stopped"
 
   compose up -d >/dev/null
@@ -437,6 +464,90 @@ scenario_restore_without_version() {
 
   compose up -d >/dev/null
   if wait_for_health 120 >/dev/null; then ok "could restart afterwards"; else bad "could not restart afterwards"; fi
+}
+
+scenario_upgrade_from_release() {
+  scenario "13. upgrading from the released v2.0.1 keeps data and manual icons"
+  if ! docker image inspect xiaowork-nav:v2.0.1-old >/dev/null 2>&1; then
+    bad "the v2.0.1 image is unavailable; cannot test the upgrade path"
+    return
+  fi
+
+  # Start from an empty data directory so the old image can own the schema.
+  compose down -v >/dev/null 2>&1 || true
+  rm -rf "${DATA_DIR:?}"/* 2>/dev/null || true
+
+  write_env v2.0.1-old
+  compose up -d >/dev/null
+  wait_for_health 120 >/dev/null || { bad "v2.0.1 baseline did not become healthy"; return; }
+  assert_eq "$(schema_version 2>/dev/null || true)" "2" "released image uses the previous schema"
+
+  curl -fsS -X POST "${base_url}/api/v1/setup" -H 'Content-Type: application/json' \
+    -d '{"username":"admin","password":"deploy-test-pass"}' >/dev/null
+  local cookie
+  cookie="$(login_cookie)"
+  [[ -n "${cookie}" ]] || { bad "could not log in"; return; }
+
+  printf '%s' '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#7c6cff"/></svg>' \
+    > "${WORK_ROOT}/manual-icon.svg"
+  local uploaded icon_url
+  # The host-style path keeps curl (a native binary) able to open the file on
+  # Windows, where MSYS would otherwise rewrite the POSIX path.
+  uploaded="$(curl -fsS -X POST "${base_url}/api/v1/admin/uploads/icon" -H "Cookie: ${cookie}" \
+    -F "file=@${WORK_ROOT_HOST}/manual-icon.svg;type=image/svg+xml" 2>/dev/null || true)"
+  icon_url="$(printf '%s' "${uploaded}" | sed -n 's/.*"url":"\([^"]*\)".*/\1/p')"
+  assert_not_eq "${icon_url}" "" "manual SVG icon uploaded"
+  if [[ -z "${icon_url}" ]]; then
+    dump "${uploaded}"
+    return
+  fi
+
+  curl -fsS -X POST "${base_url}/api/v1/admin/categories" -H 'Content-Type: application/json' \
+    -H "Cookie: ${cookie}" -d '{"name":"升级测试"}' >/dev/null
+  curl -fsS -X POST "${base_url}/api/v1/admin/bookmarks" -H 'Content-Type: application/json' \
+    -H "Cookie: ${cookie}" \
+    -d "{\"category_id\":1,\"title\":\"手动图标站点\",\"url\":\"https://example.com/\",\"icon_type\":\"upload\",\"icon_value\":\"${icon_url}\"}" >/dev/null
+  curl -fsS -X POST "${base_url}/api/v1/admin/bookmarks" -H 'Content-Type: application/json' \
+    -H "Cookie: ${cookie}" \
+    -d '{"category_id":1,"title":"普通站点","url":"https://example.org/"}' >/dev/null
+
+  local cats_before bookmarks_before
+  cats_before="$(db_field categories)"
+  bookmarks_before="$(db_field bookmarks)"
+  assert_eq "${cats_before}" "1" "one category before the upgrade"
+  assert_eq "${bookmarks_before}" "2" "two bookmarks before the upgrade"
+
+  # APP_VERSION still points at the released image, so update.sh performs a
+  # real upgrade instead of reporting a no-op.
+  local out
+  out="$("${ROOT_DIR}/scripts/update.sh" v2.0.1 --compose compose.yaml --no-pull --yes 2>&1 || true)"
+  assert_contains "${out}" "update complete" "upgrade reports success"
+  assert_eq "$(get_env APP_VERSION)" "v2.0.1" "APP_VERSION is the target"
+  assert_eq "$(schema_version 2>/dev/null || true)" "${EXPECTED_SCHEMA}" "schema advanced to the new version"
+  assert_eq "$(db_field categories)" "${cats_before}" "category count unchanged"
+  assert_eq "$(db_field bookmarks)" "${bookmarks_before}" "bookmark count unchanged"
+
+  local status
+  status="$(curl -s -o /dev/null -w '%{http_code}' "${base_url}${icon_url}")"
+  assert_eq "${status}" "200" "manual uploaded icon is still served after the upgrade"
+
+  local uploads
+  uploads="$(db_field uploads)"
+  assert_eq "${uploads}" "1" "uploaded icon metadata survived the upgrade"
+  dump "${out}"
+}
+
+scenario_unwritable_data_dir() {
+  scenario "14. an unwritable data directory fails fast with guidance"
+
+  local out
+  out="$(MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
+    -u 12345:12345 -v "${DATA_DIR_HOST}:/data:ro" \
+    xiaowork-nav:v2.0.1 --db-info --db /data/app.db 2>&1 || true)"
+
+  assert_contains "${out}" "is not writable" "detects the unwritable directory"
+  assert_contains "${out}" "chown" "prints an actionable fix"
+  assert_contains "${out}" "Never use chmod 777" "explicitly warns against loosening permissions"
 }
 
 scenario_npm_mode_failure() {
@@ -494,6 +605,8 @@ main() {
   scenario_restore_with_version
   scenario_restore_without_version
   scenario_npm_mode_failure
+  scenario_upgrade_from_release
+  scenario_unwritable_data_dir
 
   printf '\n'
   if [[ "${FAILED}" -eq 0 ]]; then

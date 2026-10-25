@@ -20,6 +20,16 @@ production.
 
 - **Navigation home page** — category groups, icon tiles, clock, live search and
   a switchable search engine. Responsive down to 390px.
+- **Two navigation layouts** — *scroll* (every category stacked, with a fixed
+  category rail on desktop) and *tabs* (one category at a time behind a
+  horizontal tab strip). Switch with one click; the choice is remembered
+  locally and is independent of the light/dark theme.
+- **Automatic site icons** — for sites without a manually chosen icon, the
+  server fetches the icon the site itself declares (web app manifest,
+  apple-touch-icon, `rel=icon`), falls back to `/favicon.ico`, and caches it in
+  `/data/uploads`. A clearly labelled brand guess is the last resort. Icons you
+  set yourself are never overwritten, and the admin UI can fill in everything
+  missing in one background job.
 - **Admin UI** — categories, bookmarks, drag-and-drop ordering, icons, site
   settings and data management, all behind a session login.
 - **Icons** — external URL, local upload, verified [Simple Icons](https://simpleicons.org/)
@@ -32,7 +42,9 @@ production.
   restore.
 - **Themes** — light and dark, following the system by default.
 - **Deployment** — one container, `docker compose`, persistent `/data`, upgrade
-  script with automatic pre-update snapshot and safe rollback.
+  script with automatic pre-update snapshot and safe rollback. The container
+  never runs as root, and the install script takes care of the data-directory
+  ownership so first deployments do not hit `permission denied`.
 
 ## Quick start
 

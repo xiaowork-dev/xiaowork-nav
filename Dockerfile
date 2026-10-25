@@ -48,6 +48,8 @@ RUN apk add --no-cache ca-certificates tzdata wget \
  && adduser -S -G app -h /app app
 
 COPY --from=backend /out/xiaowork-nav /usr/local/bin/xiaowork-nav
+COPY deploy/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod 0755 /usr/local/bin/docker-entrypoint.sh
 
 WORKDIR /app
 RUN mkdir -p /data && chown -R app:app /data /app
@@ -64,4 +66,7 @@ VOLUME ["/data"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://127.0.0.1:8080/healthz >/dev/null 2>&1 || exit 1
 
-ENTRYPOINT ["/usr/local/bin/xiaowork-nav"]
+# The entrypoint verifies that /data is writable and then runs the server.
+# It stays unprivileged: the container never starts as root.
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["/usr/local/bin/xiaowork-nav"]

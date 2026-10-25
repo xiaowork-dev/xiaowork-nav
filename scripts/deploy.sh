@@ -41,6 +41,10 @@ require_docker
 require_env_file
 validate_compose
 
+# Make sure the container user can write to the bind-mounted data directory
+# before touching anything else (see docs/installation.md §7).
+ensure_data_dirs
+
 if [[ "${SHOW_LOGS}" -eq 1 ]]; then
   compose logs -f "${SERVICE_NAME}"
   exit 0

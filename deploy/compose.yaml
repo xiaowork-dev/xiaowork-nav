@@ -15,6 +15,9 @@ services:
     image: ${XN_IMAGE:-ghcr.io/xiaowork-dev/xiaowork-nav}:${APP_VERSION:-latest}
     container_name: ${XN_CONTAINER_NAME:-xiaowork-nav}
     restart: unless-stopped
+    # Never run as root. Defaults to the image's app user; install.sh points
+    # this at the host data-directory owner when it cannot chown instead.
+    user: "${XN_UID:-100}:${XN_GID:-101}"
     env_file:
       - .env
     environment:

@@ -94,6 +94,7 @@ cd ..
 | `XN_ALLOW_GUEST_ACCESS` | `true` | 是否允许游客浏览公开导航 |
 | `XN_SECURE_COOKIE` | `true` | 会话 Cookie 是否标记 `Secure`（HTTPS 下保持 true） |
 | `XN_BACKUP_KEEP` | `5` | 应用内保留的备份快照数量 |
+| `XN_UID` / `XN_GID` | `100` / `101` | 容器运行使用的 uid/gid（**非 root**）。数据目录属主不同时可改为该属主的 id |
 | `XN_UPDATE_REPO` | – | 更新检查使用的 `owner/name` |
 | `XN_TRUSTED_PROXIES` | – | 受信任代理 CIDR（用于 `X-Forwarded-*`） |
 | `XN_ALLOWED_ORIGINS` | – | 额外允许的 CORS 来源（仅开发用） |
@@ -112,6 +113,36 @@ cd ..
 ```
 
 更新镜像不会影响该目录。**请把它纳入你的常规备份。**
+
+#### 目录权限（首次部署最常见的问题）
+
+容器**以非 root 用户运行**（默认 `uid=100 gid=101`），而数据目录是宿主机绑定挂载，
+属主由宿主机决定。如果该目录由其他账号（例如 root）创建，应用在写入时会出现：
+
+```text
+mkdir /data/uploads: permission denied
+```
+
+`./scripts/install.sh` 会自动处理：以 root 运行时把目录 `chown` 给容器用户；
+无法 `chown` 时自动把 `XN_UID`/`XN_GID` 设为**当前账号**的 uid/gid，让容器与宿主机属主一致。
+
+手动修复（任选其一，**不要使用 `chmod 777`**）：
+
+```bash
+# 1) 把目录交给容器用户
+sudo chown -R 100:101 /path/to/data
+
+# 2) 让容器以目录属主身份运行（无需 root）
+id -u   # 记下 uid
+id -g   # 记下 gid
+# 写入 deploy/.env：
+#   XN_UID=<uid>
+#   XN_GID=<gid>
+docker compose -f deploy/compose.yaml up -d
+```
+
+容器启动时会校验数据目录可写，失败时直接给出**可复制执行**的修复命令并退出，
+不会留下一个看似启动成功、实则无法保存图标的实例。
 
 ---
 
@@ -149,6 +180,7 @@ curl -fsS http://127.0.0.1:8787/api/v1/version
 | --- | --- |
 | `install.sh` 报 docker 未运行 | 启动 Docker 守护进程；`docker info` 应能返回信息 |
 | 容器 `unhealthy` | `docker compose -f deploy/compose.yaml logs --tail=80 app`；确认数据目录可写 |
+| 启动日志出现 `permission denied` / `is not writable` | 数据目录属主与容器用户不一致，见 §4「目录权限」；**不要用 `chmod 777`** |
 | NPM 502 | 确认应用与 NPM 在同一网络、转发端口为 `8080`、容器名与 `XN_CONTAINER_NAME` 一致 |
 | 页面能开但登录后立刻掉线 | HTTPS 下需 `XN_SECURE_COOKIE=true`；HTTP 调试时设为 `false` |
 | 数据看似丢失 | 确认 `XN_DATA_HOST_DIR` 未改动；可用 `./scripts/restore.sh` 恢复快照 |

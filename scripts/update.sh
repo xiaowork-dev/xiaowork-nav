@@ -52,6 +52,10 @@ require_docker
 require_env_file
 validate_compose
 
+# The data directory must be writable by the container user; the previous
+# version may have created it as a different owner.
+ensure_data_dirs
+
 CURRENT_VERSION="$(get_env APP_VERSION)"
 CURRENT_VERSION="${CURRENT_VERSION:-unknown}"
 TARGET_REF="$(image_ref_for "${TARGET_VERSION}")"

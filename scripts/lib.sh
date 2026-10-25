@@ -93,6 +93,74 @@ data_host_dir() {
   esac
 }
 
+# dir_owner prints the numeric uid that owns a path (empty when unknown).
+dir_owner() {
+  stat -c '%u' "$1" 2>/dev/null || stat -f '%u' "$1" 2>/dev/null || printf ''
+}
+
+# ensure_data_dirs creates the persistent directories and makes sure the
+# container user can write to them.
+#
+# The container never runs as root, so the fix is never "chmod 777": either the
+# directory is given to the container user, or the container is told to run as
+# the directory's owner through XN_UID/XN_GID.
+ensure_data_dirs() {
+  local data_dir uploads backups uid gid had_data=0
+  data_dir="$(data_host_dir)"
+  uploads="${data_dir}/uploads"
+  backups="${data_dir}/backups"
+
+  # Decide whether this is a fresh directory *before* creating subdirectories,
+  # because creating them would make an empty directory look non-empty.
+  if [[ -d "${data_dir}" && -n "$(ls -A "${data_dir}" 2>/dev/null)" ]]; then
+    had_data=1
+  fi
+
+  mkdir -p "${data_dir}" "${uploads}" "${backups}" 2>/dev/null \
+    || die "cannot create the data directory: ${data_dir}"
+
+  uid="$(get_env XN_UID)"; uid="${uid:-100}"
+  gid="$(get_env XN_GID)"; gid="${gid:-101}"
+
+  # Already owned by the container user: nothing to do.
+  if [[ "$(dir_owner "${data_dir}")" == "${uid}" ]]; then
+    return 0
+  fi
+
+  if [[ "$(id -u)" -eq 0 ]]; then
+    log "giving ${data_dir} to the container user (uid ${uid}:${gid})"
+    chown -R "${uid}:${gid}" "${data_dir}" || warn "chown failed; the container may not be able to write"
+    return 0
+  fi
+
+  if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+    log "giving ${data_dir} to the container user (uid ${uid}:${gid}) via sudo"
+    sudo chown -R "${uid}:${gid}" "${data_dir}" || warn "chown failed; the container may not be able to write"
+    return 0
+  fi
+
+  # Ownership cannot be changed here.
+  #
+  # Only a *fresh* install may re-point the container at this host account:
+  # switching on an existing deployment would make the container unable to
+  # write the files it already created as the default user. Existing data is
+  # therefore left exactly as it is, with an actionable warning.
+  if [[ "${had_data}" -eq 0 ]]; then
+    local host_uid host_gid
+    host_uid="$(id -u)"
+    host_gid="$(id -g)"
+    warn "cannot change the owner of ${data_dir}; running the container as uid ${host_uid}:${host_gid} instead"
+    set_env XN_UID "${host_uid}"
+    set_env XN_GID "${host_gid}"
+    return 0
+  fi
+
+  warn "${data_dir} is not owned by the container user (uid ${uid}:${gid})."
+  warn "if the container reports a permission error, fix it with one of:"
+  warn "  sudo chown -R ${uid}:${gid} ${data_dir}"
+  warn "  set XN_UID/XN_GID in deploy/.env to the directory owner (id -u / id -g)"
+}
+
 # ---------- image references ----------
 
 image_repo() {

@@ -312,6 +312,7 @@ systemctl enable --now xiaowork-nav-update.timer
 | `latest` 更新提示"无需操作" | 镜像摘要未变，属正常行为；如确认上游已发布新版本，检查是否推送到了同一标签 |
 | `compose pull` 失败 | 检查网络与 GHCR 访问；或使用 `--local` 与本地镜像 |
 | 更新后数据"消失" | 确认 `XN_DATA_HOST_DIR` 未变；`./scripts/restore.sh` 可恢复 |
+| 升级后容器启动即退出，日志提示目录不可写 | 数据目录属主与容器用户不一致；见[安装指南 §4](installation.md)。可运行 `./scripts/update.sh` 重新修复，或手动 `chown`/设置 `XN_UID` |
 | `restore.sh` 提示"refusing to start" | 快照文件名未包含版本。用 `--version vX.Y.Z` 指定后重跑 |
 | 磁盘空间不足 | 清理旧快照（`--keep`）与未使用的镜像（`docker image prune`） |
 | 想跳过确认 | 加 `--yes`（请确保已备份） |

@@ -43,6 +43,9 @@ ensure_env_file
 if [[ -n "${BIND_ADDR}" ]]; then set_env XN_BIND_ADDR "${BIND_ADDR}"; fi
 if [[ -n "${PUBLISH_PORT}" ]]; then set_env XN_PUBLISH_PORT "${PUBLISH_PORT}"; fi
 
+log "preparing the data directory"
+ensure_data_dirs
+
 log "validating compose configuration (${COMPOSE_FILE})"
 validate_compose
 
