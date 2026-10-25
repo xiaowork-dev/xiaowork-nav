@@ -14,8 +14,8 @@
 | 阶段编号与名称 | **P5 Docker 部署、GitHub 开源与版本发布** |
 | 阶段目标 | 让其他用户可以方便地安装、升级与维护：开源准备、一键部署、版本发布与更新、真实环境部署验证 |
 | 阶段开始日期 | 2026-10-25 |
-| 阶段完成日期 | 2026-10-25 |
-| 当前完成状态 | **全部完成**：代码与部署工件已在真实 Docker 环境验证；GitHub 仓库已创建并推送；CI 通过；多架构镜像已发布到 GHCR（匿名可拉取）；GitHub Release 已创建 |
+| 阶段完成日期 | 2026-10-25（v2.0.1 补充修复：2026-10-25） |
+| 当前完成状态 | **全部完成**：代码与部署工件已在真实 Docker 环境验证；GitHub 仓库已创建并推送；CI 通过；多架构镜像已发布到 GHCR（匿名可拉取）；GitHub Release 已创建。**验收复审后新增 v2.0.1 补充修复**（一键更新与数据库回滚，见 §12） |
 | 上位依据 | `AGENTS.md`、`docs/installation.md`、`docs/updating.md` |
 
 ---
@@ -325,6 +325,53 @@ Release 流水线各任务耗时：
 2. 可选：清理 GHCR 遗留标签（§9.3）。
 3. 可选：提供真实 Git 提交身份，替换本地占位身份。
 4. 进入后续版本（P1 增强项：多主题、书签导入、PWA 等，见 `docs/requirements.md` §2）。
+
+---
+
+## 12. P5 补充交付（v2.0.1）：一键更新与数据库回滚缺陷修复
+
+P5 验收复审确认 Docker 部署、CI/CD、GHCR 与 Release 通过，但**一键更新与数据库回滚**
+存在缺陷。修复已在 2026-10-25 完成并通过真实 Docker 异常注入验证。
+
+- **完整增量记录**：[`20261025-170154-p5-update-rollback-fix.md`](20261025-170154-p5-update-rollback-fix.md)
+- **版本**：V2.0.1（数据库结构版本仍为 `2`，**无结构变更**，可从 2.0.0 直接升级）
+- **历史标签 `v2.0.0` 未移动、未重建**
+
+### 12.1 修复摘要
+
+| # | 缺陷 | 修复 |
+| --- | --- | --- |
+| 1 | `latest` 与当前版本相同时直接退出，永不重新拉取 | 可变标签（`latest`、`v2.0`）总是查询并拉取；镜像未变且容器健康时报告"无需操作"且不重建容器；固定 `vX.Y.Z` 仍幂等 |
+| 2 | `app_schema_version()` 依赖宿主机 `127.0.0.1` 端口，NPM 模式不发布端口 | 新增 `--db-info` 命令行模式，**直接读数据库文件**获得结构版本与行数；不依赖端口、容器停止时也可用、只读 |
+| 3 | 回滚判断依赖 HTTP，无法判断时行为不安全 | 结构版本变大 / 无法读取 / 更新前未知 → **先用更新前快照恢复数据**再切回旧镜像；覆盖拉取失败、启动失败、健康检查失败、迁移后失败、版本不可读、NPM 模式失败六类场景 |
+| 4 | 回滚只看 `docker compose up -d` 退出码 | 回滚后**再次验证**健康检查、结构版本与书签行数 |
+| 5 | `restore.sh` 恢复旧库后又用新镜像启动并重新迁移 | 启动**之前**把 `APP_VERSION` 切到快照版本（`--version` 指定或从文件名推断）；版本未知时只恢复数据、保持停止并打印指引 |
+
+### 12.2 本阶段新增/修改（摘要）
+
+- 后端：`cmd/server/main.go`（`--db-info`）、`internal/migrations`（`ReadVersion`）、
+  `internal/store`（`OpenForInspection`）；新增 2 个测试文件。
+- 脚本：`scripts/lib.sh`、`scripts/update.sh`、`scripts/restore.sh` 重写关键逻辑。
+- 测试：新增 `scripts/tests/deploy-faults.test.sh`（12 场景 / 43 断言）。
+- 文档：`docs/updating.md`、`docs/deployment.md`、`docs/installation.md`、`README.md`、`CHANGELOG.md`。
+- 决策：新增 [`docs/decisions/ADR-0005-db-info-inspection.md`](../decisions/ADR-0005-db-info-inspection.md)
+  （用 `--db-info` 直接读库判断结构版本，替代依赖宿主机端口的 HTTP 查询）。
+- CI：shellcheck 覆盖 `scripts/tests/*.sh`。
+
+### 12.3 验证结果（2026-10-25）
+
+| 检查 | 结果 |
+| --- | --- |
+| 后端 `go build` / `go vet` | ✅ 通过 |
+| 后端 `go test -count=1 ./...` | ✅ **75 通过 / 0 失败** |
+| 前端 `npm run build` | ✅ 通过 |
+| `bash -n` 全部脚本 | ✅ 通过 |
+| Compose 配置校验（独立 + NPM） | ✅ 通过 |
+| OpenAPI YAML 语法 | ✅ 通过 |
+| **异常注入测试（真实 Docker，12 场景）** | ✅ **43 断言全部通过，0 失败** |
+
+未执行项：真实 NPM 反代 + HTTPS 端到端、真实 GHCR 新版本拉取升级（v2.0.1 发布前镜像
+尚不存在）、长期稳定性与并发、Linux 原生运行测试脚本（本机为 Windows + Docker Desktop）。
 
 ---
 

@@ -152,6 +152,8 @@ curl -fsS http://127.0.0.1:8787/api/v1/version
 | NPM 502 | 确认应用与 NPM 在同一网络、转发端口为 `8080`、容器名与 `XN_CONTAINER_NAME` 一致 |
 | 页面能开但登录后立刻掉线 | HTTPS 下需 `XN_SECURE_COOKIE=true`；HTTP 调试时设为 `false` |
 | 数据看似丢失 | 确认 `XN_DATA_HOST_DIR` 未改动；可用 `./scripts/restore.sh` 恢复快照 |
+| `restore.sh` 提示 "refusing to start" | 快照文件名不含版本；加 `--version vX.Y.Z` 指定后重跑（见[更新指南 §3](updating.md)） |
+| NPM 模式下想确认结构版本 | 用 `--db-info` 读数据库文件，无需宿主机端口（见[更新指南 §1.2](updating.md)） |
 | 端口被占用 | `./scripts/install.sh --port <空闲端口>` |
 
 ---

@@ -116,6 +116,32 @@ func CheckCompatible(db *sql.DB) (current, latest int, err error) {
 	return current, latest, nil
 }
 
+// ReadVersion returns the applied schema version without creating anything.
+//
+// Unlike CurrentVersion it never writes, so it is safe to call against a
+// database the running application still owns, and it returns 0 when the
+// schema_migrations table does not exist yet.
+func ReadVersion(db *sql.DB) (int, error) {
+	var exists int
+	if err := db.QueryRow(
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'`,
+	).Scan(&exists); err != nil {
+		return 0, fmt.Errorf("look up schema_migrations: %w", err)
+	}
+	if exists == 0 {
+		return 0, nil
+	}
+
+	var v sql.NullInt64
+	if err := db.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&v); err != nil {
+		return 0, fmt.Errorf("read schema version: %w", err)
+	}
+	if !v.Valid {
+		return 0, nil
+	}
+	return int(v.Int64), nil
+}
+
 // Apply runs all pending migrations and returns the versions it applied.
 func Apply(db *sql.DB) ([]int, error) {
 	if err := ensureTable(db); err != nil {

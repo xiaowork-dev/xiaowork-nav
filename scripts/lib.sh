@@ -5,8 +5,11 @@
 # Callers must set these before sourcing:
 #   ROOT_DIR    repository root
 #   DEPLOY_DIR  directory holding compose files and .env
-#   ENV_FILE    path to the .env file
-#   COMPOSE_FILE  compose file name (default compose.yaml)
+#
+# Optional:
+#   ENV_FILE      defaults to ${DEPLOY_DIR}/.env
+#   COMPOSE_FILE  defaults to compose.yaml
+#   SERVICE_NAME  defaults to app
 #
 # This file is sourced, never executed.
 
@@ -17,6 +20,7 @@ set -Eeuo pipefail
 ENV_FILE="${ENV_FILE:-${DEPLOY_DIR}/.env}"
 COMPOSE_FILE="${COMPOSE_FILE:-compose.yaml}"
 SERVICE_NAME="${SERVICE_NAME:-app}"
+DEFAULT_IMAGE="ghcr.io/xiaowork-dev/xiaowork-nav"
 
 # ---------- logging ----------
 
@@ -89,16 +93,49 @@ data_host_dir() {
   esac
 }
 
-image_ref() {
-  local image version
-  image="$(get_env XN_IMAGE)"
-  version="$(get_env APP_VERSION)"
-  image="${image:-ghcr.io/xiaowork-dev/xiaowork-nav}"
-  version="${version:-latest}"
-  printf '%s:%s\n' "${image}" "${version}"
+# ---------- image references ----------
+
+image_repo() {
+  local repo
+  repo="$(get_env XN_IMAGE)"
+  printf '%s\n' "${repo:-${DEFAULT_IMAGE}}"
 }
 
-# ---------- tar helpers ----------
+# image_ref_for <tag> builds "<repo>:<tag>"; without an argument the configured
+# APP_VERSION is used.
+image_ref_for() {
+  local tag="${1:-$(get_env APP_VERSION)}"
+  tag="${tag:-latest}"
+  printf '%s:%s\n' "$(image_repo)" "${tag}"
+}
+
+image_ref() { image_ref_for "$(get_env APP_VERSION)"; }
+
+local_image_id() {
+  docker image inspect --format '{{.Id}}' "$1" 2>/dev/null || true
+}
+
+container_image_id() {
+  local cid
+  cid="$(container_id)"
+  [[ -n "${cid}" ]] || return 1
+  docker inspect --format '{{.Image}}' "${cid}" 2>/dev/null
+}
+
+# A tag is mutable when it can move to a new digest: "latest" or a partial
+# version such as "v2.0". A full "vMAJOR.MINOR.PATCH" is treated as immutable.
+is_mutable_tag() {
+  local tag="$1"
+  if [[ -z "${tag}" || "${tag}" == "latest" ]]; then
+    return 0
+  fi
+  if [[ "${tag}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+    return 1
+  fi
+  return 0
+}
+
+# ---------- tar ----------
 
 # GNU tar interprets "host:path" in -f/-C arguments (which breaks Windows-style
 # paths such as C:/data). --force-local disables that; other tar implementations
@@ -139,14 +176,49 @@ wait_for_health() {
   return 1
 }
 
-# app_schema_version reads the database schema version from the running app.
-app_schema_version() {
-  local port version_json
-  port="$(get_env XN_PUBLISH_PORT)"
-  port="${port:-8787}"
-  version_json="$(curl -fsS --max-time 5 "http://127.0.0.1:${port}/api/v1/version" 2>/dev/null || true)"
-  [[ -n "${version_json}" ]] || return 1
-  printf '%s\n' "${version_json}" | sed -n 's/.*"schema_version":\([0-9]*\).*/\1/p'
+# ---------- database inspection ----------
+#
+# The scripts must be able to read the database state in every Compose mode and
+# even when the application cannot start. Asking the running container over HTTP
+# fails in the NPM mode (no published host port) and when the container is down,
+# so the application image is run as a one-shot helper against the data
+# directory instead.
+
+# db_info prints key=value lines describing the database, or returns 1 when the
+# image is unavailable or the database cannot be read.
+db_info() {
+  local data_dir image out
+  data_dir="$(data_host_dir)"
+  image="$(image_ref)"
+  [[ -d "${data_dir}" ]] || return 1
+  docker image inspect "${image}" >/dev/null 2>&1 || return 1
+
+  # MSYS_NO_PATHCONV/MSYS2_ARG_CONV_EXCL stop Git Bash on Windows from rewriting
+  # the in-container "/data/app.db" argument into a Windows path. They are inert
+  # on Linux and macOS.
+  out="$(MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
+    -v "${data_dir}:/data" \
+    "${image}" --db-info --db /data/app.db 2>/dev/null || true)"
+  [[ -n "${out}" ]] || return 1
+  printf '%s\n' "${out}"
+}
+
+# db_field prints a single field from db_info, or returns 1 when unavailable.
+db_field() {
+  local key="$1" info value
+  info="$(db_info 2>/dev/null || true)"
+  [[ -n "${info}" ]] || return 1
+  value="$(printf '%s\n' "${info}" | sed -n "s/^${key}=//p" | tail -n1)"
+  [[ -n "${value}" ]] || return 1
+  printf '%s\n' "${value}"
+}
+
+schema_version() { db_field schema_version; }
+
+# ---------- snapshots ----------
+
+snapshot_dir() {
+  printf '%s\n' "$(dirname "$(data_host_dir)")/xiaowork-nav-backups"
 }
 
 # snapshot_data_dir takes a consistent snapshot of the data directory.
@@ -155,11 +227,34 @@ snapshot_data_dir() {
   local data_dir backup_dir stamp target
   data_dir="$(data_host_dir)"
   [[ -d "${data_dir}" ]] || die "data directory not found: ${data_dir}"
-  backup_dir="$(dirname "${data_dir}")/xiaowork-nav-backups"
+  backup_dir="$(snapshot_dir)"
   mkdir -p "${backup_dir}"
   stamp="$(date -u +%Y%m%d-%H%M%S)"
   target="${backup_dir}/pre-update-$(get_env APP_VERSION)-${stamp}.tar.gz"
   # shellcheck disable=SC2086  # TAR_EXTRA is intentionally word-split (may be empty)
   tar ${TAR_EXTRA} -czf "${target}" -C "${data_dir}" . || die "snapshot failed"
   printf '%s\n' "${target}"
+}
+
+# restore_snapshot replaces the data directory with the snapshot contents.
+# The caller must stop the service first.
+restore_snapshot() {
+  local snapshot="$1" data_dir
+  data_dir="$(data_host_dir)"
+  log "restoring data from ${snapshot}"
+  rm -rf "${data_dir:?}"/* 2>/dev/null || true
+  # shellcheck disable=SC2086  # TAR_EXTRA is intentionally word-split (may be empty)
+  tar ${TAR_EXTRA} -xzf "${snapshot}" -C "${data_dir}" || die "failed to restore snapshot ${snapshot}"
+}
+
+# version_from_snapshot infers the application version from a snapshot filename
+# such as backup-v2.0.0-20261025-101500.tar.gz. It prints nothing when the name
+# does not follow the "<kind>-<version>-<timestamp>.tar.gz" convention, so the
+# caller can refuse to start instead of guessing.
+version_from_snapshot() {
+  local base
+  base="$(basename "$1")"
+  if [[ "${base}" =~ ^(backup|pre-update|restore)-(.+)-[0-9]{8}-[0-9]{6}(-[0-9]+)?\.tar\.gz$ ]]; then
+    printf '%s\n' "${BASH_REMATCH[2]}"
+  fi
 }

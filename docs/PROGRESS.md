@@ -1,16 +1,18 @@
 # 项目进度总览
 
-> 最后更新：2026-10-25 08:00（Asia/Shanghai）
-> 项目：XiaoWork Nav V2.0（版本 **2.0.0**）
-> 总体状态：**已发布** —— 仓库已开源、CI 通过、多架构镜像已推送 GHCR、GitHub Release 已创建
+> 最后更新：2026-10-25 17:00（Asia/Shanghai）
+> 项目：XiaoWork Nav V2.0（版本 **2.0.1**）
+> 总体状态：**已发布** —— v2.0.0 已开源发布；v2.0.1 修复了 P5 验收复审发现的一键更新与
+> 数据库回滚缺陷，已通过真实 Docker 异常注入验证，待发布
 >
 > 交付规范见 [`../AGENTS.md`](../AGENTS.md)：每阶段必须产出 `docs/deliveries/P<N>-delivery.md`。
 
 ## 项目目标与当前阶段
 
 - 核心目标：将旧版个人导航站重构为轻量、可自托管、可公开开源、支持一键部署与一键更新的产品。
-- 当前阶段：**P5 Docker 部署、GitHub 开源与版本发布** —— ✅ 已完成。
-- 本轮里程碑：仓库创建并推送、CI 全绿、多架构（amd64/arm64）镜像发布到 GHCR 且匿名可拉取、GitHub Release `v2.0.0` 发布；发布过程中修复了 QEMU 构建过慢与镜像标签缺少 `v` 前缀两个问题。
+- 当前阶段：**P5 Docker 部署、GitHub 开源与版本发布** —— ✅ 已完成；验收复审后进入
+  **P5 补充（v2.0.1 一键更新与回滚修复）** —— ✅ 修复完成并通过真实验证。
+- 本轮里程碑：仓库创建并推送、CI 全绿、多架构（amd64/arm64）镜像发布到 GHCR 且匿名可拉取、GitHub Release `v2.0.0` 发布；发布过程中修复了 QEMU 构建过慢与镜像标签缺少 `v` 前缀两个问题。**v2.0.1** 修复了 `latest` 更新判定、NPM 模式结构版本检测、失败自动回滚与 `restore.sh` 安全恢复。
 
 ## 已完成（仅列已经验证的成果）
 
@@ -41,6 +43,11 @@
 | CI / Release 流水线 | 已完成 | CI 全绿（main + tag）；Release 成功构建并推送多架构镜像 | [P5 报告 §9](deliveries/P5-delivery.md) |
 | GitHub 仓库与镜像发布 | 已完成 | 仓库公开；`ghcr.io/xiaowork-dev/xiaowork-nav:v2.0.0` 匿名拉取成功并运行正常 | [P5 报告 §9](deliveries/P5-delivery.md) |
 | GitHub Release | 已完成 | `v2.0.0`（Latest）已创建并含安装/升级说明 | [Release](https://github.com/xiaowork-dev/xiaowork-nav/releases/tag/v2.0.0) |
+| **v2.0.1 一键更新逻辑修复** | 已完成 | 异常注入场景 3/4/5：`latest` 未变化不重建容器、镜像缺失与拉取失败均不改动现场 | [补充记录 §2.1](deliveries/20261025-170154-p5-update-rollback-fix.md) |
+| **v2.0.1 NPM 模式结构版本检测** | 已完成 | 新增 `--db-info`；场景 1/9 实测：容器运行时与停止时均可读 `schema_version=2`，不依赖宿主机端口 | [补充记录 §2.2](deliveries/20261025-170154-p5-update-rollback-fix.md) |
+| **v2.0.1 更新失败自动回滚** | 已完成 | 场景 6/7/8/12：启动失败、迁移后健康检查失败、结构版本不可读、NPM 模式失败均回滚并**再次验证**健康与数据 | [补充记录 §2.3](deliveries/20261025-170154-p5-update-rollback-fix.md) |
+| **v2.0.1 restore.sh 安全恢复** | 已完成 | 场景 10/11：启动前切换到快照版本；版本未知时拒绝启动并保持停止 | [补充记录 §2.4](deliveries/20261025-170154-p5-update-rollback-fix.md) |
+| **部署脚本异常注入测试** | 已完成 | `scripts/tests/deploy-faults.test.sh` 12 场景 / 43 断言全部通过（真实 Docker） | [补充记录 §4.2](deliveries/20261025-170154-p5-update-rollback-fix.md) |
 
 ## 正在进行 / 未完成
 
@@ -52,6 +59,8 @@
 | 跨浏览器 / 真机触控 / 无障碍审计 | 未验证 | 后续版本 |
 | OpenAPI 规范级 lint / 前端类型自动生成 | 未接入 | 后续接入 CI |
 | 旧站真实数据的正式导入 | 已可在容器中导入 | 剩余 23 个占位图标见迁移报告 §13.5 |
+| v2.0.1 提交、推送与发布 | 待执行 | 提交推送 `main`、打标签 `v2.0.1`、核验 CI/Release/GHCR |
+| 用已发布镜像做一次真实 `latest` 升级验证 | 待 v2.0.1 镜像发布后执行 | 发布后在本机执行 `./scripts/update.sh latest` |
 
 ## 当前阻塞与风险
 
@@ -59,16 +68,20 @@
 - **受限网络下 Go 模块代理不可达**：构建镜像需传 `--build-arg GOPROXY=...`（已文档化）。
 - **提交身份为占位**：待用户替换。
 - **部分站点图标依赖第三方**：23 个站点显示首字母、4 个第三方 Favicon 内容透明。
+- **异常注入测试需要 Docker 与可用的 Go 模块代理**：构建测试镜像时可用 `XN_TEST_GOPROXY` 指定镜像源。
 
 ## 下一步（按优先级）
 
-1. 在独立测试服务器完成真实部署与 NPM 反代 HTTPS 验证。
-2. 可选：清理 GHCR 遗留标签、替换提交身份。
-3. 规划下一版本增强项（`docs/requirements.md` §2）。
+1. 提交并推送 `main`，创建并推送标签 `v2.0.1`，核验 CI / Release / GHCR 匿名拉取。
+2. 用已发布的 `v2.0.1` 镜像做一次真实的 `latest` 与固定版本升级验证。
+3. 在独立测试服务器完成真实部署与 NPM 反代 HTTPS 验证。
+4. 可选：清理 GHCR 遗留标签、替换提交身份。
+5. 规划下一版本增强项（`docs/requirements.md` §2）。
 
 ## 最近交付记录
 
-- **[P5 阶段交付报告](deliveries/P5-delivery.md)**（正式归档）
+- **[P5 阶段交付报告](deliveries/P5-delivery.md)**（正式归档，含 §12 v2.0.1 补充）
+- **[P5 补充交付记录：一键更新与回滚修复（v2.0.1）](deliveries/20261025-170154-p5-update-rollback-fix.md)**
 - **[P4 阶段交付报告](deliveries/P4-delivery.md)**（正式归档）
 - **[P3 阶段交付报告](deliveries/P3-delivery.md)**（正式归档）
 - [旧站数据迁移报告（含 §13 P3 收尾补充）](legacy-data-migration-report.md)
@@ -77,7 +90,16 @@
 
 ## 验证与环境说明
 
-- 最近一次验证（2026-10-25 08:00）：
+- 最近一次验证（2026-10-25 17:00，v2.0.1 修复）：
+  - 后端：`go build ./...`、`go vet ./...`、`go test -count=1 ./...` 通过（**75 通过 / 0 失败**）。
+  - 前端：`npm run build`（含 `vue-tsc` 类型检查）通过。
+  - 脚本：`bash -n` 全部通过；`docker compose config`（独立模式、NPM 模式）通过；OpenAPI YAML 语法通过。
+  - **真实 Docker 异常注入**：`scripts/tests/deploy-faults.test.sh` **12 场景 / 43 断言全部通过**
+    （覆盖 `latest` 未变化不重建、镜像缺失、拉取失败、启动失败、迁移后健康检查失败、
+    结构版本不可读、容器停止时读结构版本、`restore.sh` 版本切换与拒绝启动、NPM 模式失败回滚）。
+  - **未执行**：真实 NPM 反代与 HTTPS 实测、真实 GHCR 新版本拉取升级（v2.0.1 发布前镜像不存在）、
+    长期稳定性与并发、跨浏览器与真机、Linux 原生运行测试脚本。
+- 上一次验证（2026-10-25 08:00，v2.0.0 发布）：
   - 后端：`go build ./...`、`go vet ./...`、`go test -count=1 ./...` 通过（**71 通过 / 0 失败**）。
   - 前端：`npm run build`（含 `vue-tsc` 类型检查）通过。
   - Docker：镜像构建成功（36.2 MB）；真实环境完成 16 项部署测试（全新安装、非 root、健康检查、
@@ -90,6 +112,6 @@
   - **未执行**：NPM 反代与 HTTPS 实测、长期稳定性与并发、跨浏览器与真机。
 - 部署环境：本地 Docker Desktop（测试用临时数据目录，测试后已清理）；**未操作任何现有服务器**。
 - Git 信息：远程 `origin` → `https://github.com/xiaowork-dev/xiaowork-nav.git`；
-  分支 `main` 已推送且与远程一致；标签 `v2.0.0` 已推送。提交身份为本地占位（待用户替换）。
+  分支 `main`；历史标签 `v2.0.0` **未移动、未重建**。提交身份为本地占位（待用户替换）。
 
 > 说明：本仓库当前使用本地占位提交身份（`xiaowork-dev <xiaowork-dev@users.noreply.github.com>`），可在配置 GitHub 远程时替换为用户真实身份。

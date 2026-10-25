@@ -51,6 +51,7 @@
 | [decisions/ADR-0002-single-container-embed.md](decisions/ADR-0002-single-container-embed.md) | 单容器交付 |
 | [decisions/ADR-0003-sqlite-migrations.md](decisions/ADR-0003-sqlite-migrations.md) | SQLite 与迁移备份 |
 | [decisions/ADR-0004-openapi-contract.md](decisions/ADR-0004-openapi-contract.md) | OpenAPI 唯一契约 |
+| [decisions/ADR-0005-db-info-inspection.md](decisions/ADR-0005-db-info-inspection.md) | 部署脚本通过 `--db-info` 读取数据库状态 |
 
 ## 进度与交付
 
@@ -62,5 +63,6 @@
 | [deliveries/P2-delivery.md](deliveries/P2-delivery.md) | **P2 阶段交付报告（正式归档）** |
 | [deliveries/P3-delivery.md](deliveries/P3-delivery.md) | **P3 阶段交付报告（正式归档）** |
 | [deliveries/P4-delivery.md](deliveries/P4-delivery.md) | **P4 阶段交付报告（正式归档）** |
-| [deliveries/P5-delivery.md](deliveries/P5-delivery.md) | **P5 阶段交付报告（正式归档）** |
+| [deliveries/P5-delivery.md](deliveries/P5-delivery.md) | **P5 阶段交付报告（正式归档，含 §12 v2.0.1 补充）** |
+| [deliveries/20261025-170154-p5-update-rollback-fix.md](deliveries/20261025-170154-p5-update-rollback-fix.md) | **P5 补充交付记录：一键更新与回滚修复（v2.0.1）** |
 | [deliveries/](deliveries/) | 过程记录与后续阶段交付报告 |

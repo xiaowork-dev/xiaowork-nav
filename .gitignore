@@ -41,6 +41,10 @@ desktop.ini
 *.log
 /tmp/
 
+# ---- Local deployment overrides (test/dev only) ----
+deploy/*.local.yaml
+deploy/*.local.yml
+
 # ---- Legacy / real user data (must never be committed) ----
 # The real navigation export is imported locally only; use
 # docs/samples/legacy-data.sample.json for tests.

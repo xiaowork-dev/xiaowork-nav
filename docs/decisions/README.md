@@ -8,6 +8,7 @@
 | [ADR-0002](ADR-0002-single-container-embed.md) | 单容器交付，Go embed 托管前端 | 已接受 |
 | [ADR-0003](ADR-0003-sqlite-migrations.md) | SQLite + 版本化迁移 + 升级前备份 | 已接受 |
 | [ADR-0004](ADR-0004-openapi-contract.md) | OpenAPI 作为前后端唯一契约 | 已接受 |
+| [ADR-0005](ADR-0005-db-info-inspection.md) | 部署脚本通过 `--db-info` 直接读取数据库状态 | 已接受 |
 
 ## 模板
 

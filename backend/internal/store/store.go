@@ -47,6 +47,34 @@ func Open(path string) (*sql.DB, error) {
 	return db, nil
 }
 
+// OpenForInspection opens the database for read-only inspection.
+//
+// It is used by the `--db-info` CLI mode, which the deployment scripts call to
+// determine the schema version and row counts even when the application cannot
+// start (for example after a failed migration) and in Compose modes that
+// publish no host port. Only SELECT statements are issued.
+//
+// The connection is opened read-write because SQLite needs to read the WAL;
+// the caller must not write. The file must already exist.
+func OpenForInspection(path string) (*sql.DB, error) {
+	dsn := "file:" + path + "?" + url.Values{
+		"_pragma": {"busy_timeout(5000)"},
+	}.Encode()
+
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("open sqlite %q: %w", path, err)
+	}
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+
+	if err := db.Ping(); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("ping sqlite: %w", err)
+	}
+	return db, nil
+}
+
 func verifyPragmas(db *sql.DB) error {
 	var fk int
 	if err := db.QueryRow(`PRAGMA foreign_keys`).Scan(&fk); err != nil {

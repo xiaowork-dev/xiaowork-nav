@@ -51,12 +51,13 @@ Browser ──HTTPS──▶ 反向代理 (NPM / Nginx / Caddy)
 | `deploy/compose.yaml` | 独立模式（宿主机端口，默认 `127.0.0.1:8787`） |
 | `deploy/compose.npm.yaml` | NPM 共享网络模式（不发布宿主机端口） |
 | `deploy/.env.example` | 环境变量模板 |
-| `scripts/lib.sh` | 脚本公共函数 |
+| `scripts/lib.sh` | 脚本公共函数（含基于 `--db-info` 的结构版本读取） |
 | `scripts/install.sh` | 首次安装 |
 | `scripts/deploy.sh` | 重新部署 / 重启 / 查看日志 |
-| `scripts/update.sh` | 安全更新（快照 → 切换 → 健康检查 → 回滚） |
+| `scripts/update.sh` | 安全更新（检查/拉取 → 快照 → 切换 → 健康检查 → 验证回滚） |
 | `scripts/backup.sh` | 数据目录快照 |
-| `scripts/restore.sh` | 从快照恢复 |
+| `scripts/restore.sh` | 从快照恢复（可指定/推断版本，启动前切换） |
+| `scripts/tests/deploy-faults.test.sh` | 部署脚本异常注入测试（需 Docker） |
 | `.github/workflows/ci.yml` | 构建、测试、镜像构建、仓库安全检查 |
 | `.github/workflows/release.yml` | 多架构镜像发布到 GHCR + GitHub Release |
 
@@ -69,8 +70,11 @@ Browser ──HTTPS──▶ 反向代理 (NPM / Nginx / Caddy)
 3. **配置全部来自环境变量**：域名、网络名、端口均不写死。
 4. **更新前必快照**：`update.sh` 在改动前生成一致性备份。
 5. **结构版本保护**：数据库结构比镜像新时，应用**拒绝启动**，避免旧代码破坏数据。
-6. **失败可回滚**：可逆迁移切回旧镜像；不可逆迁移用快照恢复。
-7. **非 root 运行**：容器以 `app` 用户运行，并启用 `no-new-privileges`。
+6. **失败可回滚**：可逆迁移切回旧镜像；不可逆迁移用快照恢复；无法判断兼容性时
+   按最保守方式先恢复快照。回滚后会**再次验证**健康与数据，而非只看退出码。
+7. **检测不依赖端口**：结构版本从数据库文件读取（`--db-info`），因此在 NPM
+   共享网络模式（不发布宿主机端口）与应用停止时同样可用。
+8. **非 root 运行**：容器以 `app` 用户运行，并启用 `no-new-privileges`。
 
 ---
 

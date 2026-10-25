@@ -7,7 +7,9 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -29,6 +31,14 @@ func main() {
 }
 
 func run() int {
+	// Deployment helper mode: report database state and exit. The update and
+	// restore scripts use this because it works in every Compose mode (including
+	// ones that publish no host port) and while the application is stopped, so a
+	// failed update can still be assessed before any rollback decision.
+	if hasFlag(os.Args[1:], "--db-info") {
+		return runDBInfo(os.Args[1:])
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		slog.Error("load config", "error", err)
@@ -142,6 +152,78 @@ func run() int {
 	}
 	logger.Info("stopped")
 	return 0
+}
+
+// runDBInfo implements the `--db-info` deployment helper mode.
+func runDBInfo(args []string) int {
+	dbPath := flagValue(args, "--db")
+	if dbPath == "" {
+		if cfg, err := config.Load(); err == nil {
+			dbPath = cfg.DBPath
+		}
+	}
+	if dbPath == "" {
+		dbPath = "/data/app.db"
+	}
+	fmt.Printf("db_path=%s\n", dbPath)
+
+	if _, err := os.Stat(dbPath); err != nil {
+		fmt.Println("exists=false")
+		fmt.Println("schema_version=0")
+		return 0
+	}
+	fmt.Println("exists=true")
+
+	db, err := store.OpenForInspection(dbPath)
+	if err != nil {
+		fmt.Printf("error=%s\n", err)
+		fmt.Println("schema_version=0")
+		return 0
+	}
+	defer func() { _ = db.Close() }()
+
+	version, err := migrations.ReadVersion(db)
+	if err != nil {
+		fmt.Printf("error=%s\n", err)
+		fmt.Println("schema_version=0")
+		return 0
+	}
+	fmt.Printf("schema_version=%d\n", version)
+	fmt.Printf("categories=%d\n", countRows(db, "categories"))
+	fmt.Printf("bookmarks=%d\n", countRows(db, "bookmarks"))
+	fmt.Printf("uploads=%d\n", countRows(db, "uploads"))
+	return 0
+}
+
+// countRows returns the row count, or -1 when the table is missing or unreadable.
+func countRows(db *sql.DB, table string) int {
+	var n int
+	if err := db.QueryRow("SELECT COUNT(*) FROM " + table).Scan(&n); err != nil {
+		return -1
+	}
+	return n
+}
+
+func hasFlag(args []string, name string) bool {
+	for _, a := range args {
+		if a == name {
+			return true
+		}
+	}
+	return false
+}
+
+// flagValue reads "--name value" or "--name=value".
+func flagValue(args []string, name string) string {
+	for i, a := range args {
+		if a == name && i+1 < len(args) {
+			return args[i+1]
+		}
+		if strings.HasPrefix(a, name+"=") {
+			return strings.TrimPrefix(a, name+"=")
+		}
+	}
+	return ""
 }
 
 func newLogger(level string) *slog.Logger {

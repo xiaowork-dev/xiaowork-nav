@@ -75,23 +75,36 @@ over the shared network. See [docs/installation.md](docs/installation.md).
 
 The update script:
 
-1. records the current version and database schema version,
-2. stops the app and takes a **consistent snapshot** of the data directory,
-3. switches the version atomically and starts the new image,
-4. verifies health and the schema version,
-5. on failure restores the snapshot when the new build migrated the database,
-   then starts the previous image again.
+1. checks the target tag — a pinned version that is already deployed is a no-op,
+   while a mutable tag (`latest`, `v2.0`) always checks the registry and pulls the
+   newest image (an unchanged image leaves the container alone),
+2. reads the current version and database schema version **from the database
+   file**, so it works in every Compose mode (including NPM, which publishes no
+   host port) and even while the app is stopped,
+3. stops the app and takes a **consistent snapshot** of the data directory,
+4. switches the version atomically and starts the new image,
+5. verifies health, the schema version and the bookmark count,
+6. on failure rolls back and **re-verifies** the previous container; when the new
+   build migrated the database (or the schema cannot be determined) the
+   pre-update snapshot is restored before the previous image is started.
 
 Your database, uploaded icons and settings are never overwritten. Manual
 backup/restore is also available:
 
 ```bash
 ./scripts/backup.sh
-./scripts/restore.sh /path/to/backup-2.0.0-20261025-101500.tar.gz
+./scripts/restore.sh /path/to/backup-v2.0.0-20261025-101500.tar.gz
+./scripts/restore.sh <snapshot> --version v2.0.0   # start the matching version
 ```
 
+`restore.sh` switches `APP_VERSION` to the snapshot's version **before** starting,
+so a restored older database is never re-migrated by a newer image. When the
+version cannot be determined it restores the data, leaves the app stopped and
+prints instructions instead of guessing.
+
 See [docs/updating.md](docs/updating.md) for rollback and migration
-compatibility.
+compatibility. The failure paths are covered by
+[`scripts/tests/deploy-faults.test.sh`](scripts/tests/deploy-faults.test.sh).
 
 ## Configuration
 

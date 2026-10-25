@@ -124,7 +124,7 @@ jobs:
       - name: Shell scripts are valid
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
-          for f in scripts/*.sh; do
+          for f in scripts/*.sh scripts/tests/*.sh; do
             bash -n "$f"
             shellcheck --severity=error "$f"
           done

@@ -2,11 +2,19 @@
 #
 # XiaoWork Nav — restore the data directory from a snapshot.
 #
-#   ./scripts/restore.sh /path/to/backup-2.0.0-20261025-101500.tar.gz
+#   ./scripts/restore.sh /path/to/backup-v2.0.0-20261025-101500.tar.gz
+#   ./scripts/restore.sh <snapshot> --version v2.0.0
 #   ./scripts/restore.sh <snapshot> --compose compose.npm.yaml --yes
+#   ./scripts/restore.sh <snapshot> --no-start     # restore only
 #
-# The current data is snapshotted first, so a mistaken restore can itself be
-# undone. The application is stopped for the duration.
+# Why --version matters: restoring an older database and then starting a newer
+# image would immediately re-run the newer migrations. The script therefore sets
+# APP_VERSION to the version the snapshot came from (taken from the filename, or
+# from --version) *before* starting the container. If the version cannot be
+# determined the data is restored but nothing is started, and instructions are
+# printed instead of guessing.
+#
+# The current data is snapshotted first, so a mistaken restore can be undone.
 
 set -Eeuo pipefail
 
@@ -17,19 +25,23 @@ DEPLOY_DIR="${ROOT_DIR}/deploy"
 ENV_FILE="${DEPLOY_DIR}/.env"
 COMPOSE_FILE="compose.yaml"
 SNAPSHOT=""
+TARGET_VERSION=""
 ASSUME_YES=0
+DO_START=1
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --compose) COMPOSE_FILE="${2:?missing value for --compose}"; shift 2 ;;
+    --version) TARGET_VERSION="${2:?missing value for --version}"; shift 2 ;;
+    --no-start) DO_START=0; shift ;;
     --yes|-y)  ASSUME_YES=1; shift ;;
-    -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,19p' "$0"; exit 0 ;;
     -*)        echo "unknown argument: $1" >&2; exit 2 ;;
     *)         SNAPSHOT="$1"; shift ;;
   esac
 done
 
-[[ -n "${SNAPSHOT}" ]] || { sed -n '2,10p' "$0"; exit 2; }
+[[ -n "${SNAPSHOT}" ]] || { sed -n '2,19p' "$0"; exit 2; }
 
 # shellcheck source=scripts/lib.sh
 source "${SCRIPT_DIR}/lib.sh"
@@ -42,11 +54,25 @@ SNAPSHOT="$(cd "$(dirname "${SNAPSHOT}")" && pwd)/$(basename "${SNAPSHOT}")"
 # shellcheck disable=SC2086  # TAR_EXTRA is intentionally word-split (may be empty)
 tar ${TAR_EXTRA} -tzf "${SNAPSHOT}" >/dev/null 2>&1 || die "snapshot is not a readable tar.gz archive: ${SNAPSHOT}"
 
+# Resolve the version the snapshot belongs to.
+if [[ -z "${TARGET_VERSION}" ]]; then
+  TARGET_VERSION="$(version_from_snapshot "${SNAPSHOT}")"
+fi
+CURRENT_VERSION="$(get_env APP_VERSION)"
+CURRENT_VERSION="${CURRENT_VERSION:-unknown}"
+
 DATA_DIR="$(data_host_dir)"
 mkdir -p "${DATA_DIR}"
 
-log "snapshot to restore: ${SNAPSHOT}"
-log "target data directory: ${DATA_DIR}"
+log "snapshot      : ${SNAPSHOT}"
+log "target data   : ${DATA_DIR}"
+log "current ver.  : ${CURRENT_VERSION}"
+if [[ -n "${TARGET_VERSION}" ]]; then
+  log "snapshot ver. : ${TARGET_VERSION}"
+else
+  warn "could not determine the snapshot's application version"
+fi
+
 if [[ "${ASSUME_YES}" -ne 1 ]]; then
   printf 'This will REPLACE the current data. Continue? [y/N] '
   read -r answer
@@ -63,12 +89,52 @@ rm -rf "${DATA_DIR:?}"/* 2>/dev/null || true
 # shellcheck disable=SC2086  # TAR_EXTRA is intentionally word-split (may be empty)
 tar ${TAR_EXTRA} -xzf "${SNAPSHOT}" -C "${DATA_DIR}" || die "restore failed; current data is in ${SAFETY}"
 
+RESTORED_SCHEMA="$(schema_version 2>/dev/null || true)"
+[[ -n "${RESTORED_SCHEMA}" ]] && log "restored database schema version: ${RESTORED_SCHEMA}"
+
+if [[ "${DO_START}" -eq 0 ]]; then
+  log "restore complete; the application was left stopped (--no-start)"
+  log "previous data kept at: ${SAFETY}"
+  exit 0
+fi
+
+if [[ -z "${TARGET_VERSION}" ]]; then
+  warn "refusing to start: the snapshot's application version is unknown, and starting"
+  warn "the currently configured image (${CURRENT_VERSION}) could re-run migrations"
+  warn "against the restored database."
+  cat <<EOF
+
+Restored data is in place but the application is stopped. Start it explicitly:
+
+  cd deploy
+  sed -i 's/^APP_VERSION=.*/APP_VERSION=<the version this snapshot came from>/' .env
+  docker compose -f ${COMPOSE_FILE} up -d
+
+If you are sure the current version ${CURRENT_VERSION} matches the snapshot, run:
+
+  ./scripts/deploy.sh --no-pull
+
+Previous data kept at: ${SAFETY}
+EOF
+  exit 0
+fi
+
+if [[ "${TARGET_VERSION}" != "${CURRENT_VERSION}" ]]; then
+  log "switching APP_VERSION from ${CURRENT_VERSION} to ${TARGET_VERSION} before starting"
+  set_env APP_VERSION "${TARGET_VERSION}"
+fi
+
 log "starting the application"
 compose up -d
 if ! status="$(wait_for_health 120)"; then
   compose logs --tail=60 "${SERVICE_NAME}" || true
-  die "the application did not become healthy after the restore (status: ${status})"
+  die "the application did not become healthy after the restore (status: ${status}); previous data is in ${SAFETY}"
 fi
 
+SCHEMA_NOW="$(schema_version 2>/dev/null || true)"
+CATEGORIES_NOW="$(db_field categories 2>/dev/null || true)"
+BOOKMARKS_NOW="$(db_field bookmarks 2>/dev/null || true)"
+
 log "restore complete (status: ${status})"
+log "data: version=${TARGET_VERSION} schema=${SCHEMA_NOW:-unknown} categories=${CATEGORIES_NOW:-?} bookmarks=${BOOKMARKS_NOW:-?}"
 log "previous data kept at: ${SAFETY}"
