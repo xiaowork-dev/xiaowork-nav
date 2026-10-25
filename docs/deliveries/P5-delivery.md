@@ -193,6 +193,8 @@
 | Docker 镜像 | `ghcr.io/xiaowork-dev/xiaowork-nav:v2.0.0` | ✅ **已发布且匿名可拉取** |
 | 镜像标签 | `v2.0.0`、`v2.0`、`latest` | ✅ 多架构 `linux/amd64` + `linux/arm64` |
 | 镜像摘要 | `sha256:c8e2151f22e368d28e0016742f2aabeb8d15418fce2ec4b115485813a2ae24ee` | ✅ 已实测拉取并运行 |
+| **v2.0.1 GitHub Release** | `https://github.com/xiaowork-dev/xiaowork-nav/releases/tag/v2.0.1` | ✅ 已发布（见 §12.4） |
+| **v2.0.1 Docker 镜像** | `ghcr.io/xiaowork-dev/xiaowork-nav:v2.0.1` | ✅ 多架构，摘要 `sha256:4083919b…`，匿名拉取并运行通过 |
 
 ### 一键安装命令
 
@@ -335,6 +337,7 @@ P5 验收复审确认 Docker 部署、CI/CD、GHCR 与 Release 通过，但**一
 
 - **完整增量记录**：[`20261025-170154-p5-update-rollback-fix.md`](20261025-170154-p5-update-rollback-fix.md)
 - **版本**：V2.0.1（数据库结构版本仍为 `2`，**无结构变更**，可从 2.0.0 直接升级）
+- **发布状态**：✅ 已发布 —— CI、Release 流水线均成功；多架构镜像已推送 GHCR 且匿名可拉取；GitHub Release `v2.0.1` 已创建（见 §12.4）
 - **历史标签 `v2.0.0` 未移动、未重建**
 
 ### 12.1 修复摘要
@@ -372,6 +375,22 @@ P5 验收复审确认 Docker 部署、CI/CD、GHCR 与 Release 通过，但**一
 
 未执行项：真实 NPM 反代 + HTTPS 端到端、真实 GHCR 新版本拉取升级（v2.0.1 发布前镜像
 尚不存在）、长期稳定性与并发、Linux 原生运行测试脚本（本机为 Windows + Docker Desktop）。
+
+### 12.4 发布结果（2026-10-25）
+
+| 步骤 | 结果 |
+| --- | --- |
+| 修复提交 | `825f5bc` — `fix(deploy): harden update and rollback against failures`（22 个文件，含代码/脚本/测试/文档/ADR） |
+| 推送 `main` | ✅ `c1cadd4..825f5bc`；远程 `refs/heads/main` 与本地 HEAD 一致 |
+| CI（`main`） | ✅ 成功（run 40179651451） |
+| 标签 `v2.0.1` | ✅ 附注标签已创建并推送（标签对象 `e4c220d` → 提交 `825f5bc`） |
+| CI（标签） | ✅ 成功（run 40179801765） |
+| Release 流水线 | ✅ 成功（run 40179801770） |
+| GHCR 镜像 | ✅ `v2.0.1`（`linux/amd64` + `linux/arm64`），摘要 `sha256:4083919b…`；`v2.0` / `latest` 同步指向该摘要 |
+| 匿名拉取 + 运行 | ✅ `docker pull` 成功；`/healthz` = `{"status":"ok","version":"v2.0.1"}`；`/api/v1/version` = `v2.0.1` / commit `825f5bc` / `schema_version=2`；容器非 root |
+| 已发布镜像的 `--db-info` | ✅ 返回 `exists=true` / `schema_version=2`（证明修复已在发布产物中） |
+| GitHub Release | ✅ `v2.0.1`（非 draft / 非 prerelease）：`https://github.com/xiaowork-dev/xiaowork-nav/releases/tag/v2.0.1` |
+| 历史标签 `v2.0.0` | ✅ **未移动、未重建**：标签仍指向 `d18539d`，镜像摘要仍为 `sha256:c8e2151f…` |
 
 ---
 

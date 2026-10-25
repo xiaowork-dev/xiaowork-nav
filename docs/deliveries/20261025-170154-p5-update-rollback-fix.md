@@ -19,7 +19,7 @@
 | 目标 | 修复 P5 验收复审发现的一键更新与数据库回滚缺陷，并补充真实验证 |
 | 开始日期 | 2026-10-25 |
 | 完成日期 | 2026-10-25 |
-| 完成状态 | 代码、脚本与文档已完成；后端 `75/75` 通过；**异常注入 12 场景 / 43 断言全部通过**；待提交、推送并发布 v2.0.1 |
+| 完成状态 | **全部完成**：代码、脚本与文档已提交并推送；CI 与 Release 流水线均成功；`ghcr.io/xiaowork-dev/xiaowork-nav:v2.0.1`（amd64 + arm64）已发布且**匿名拉取成功**；GitHub Release `v2.0.1` 已创建；历史标签 `v2.0.0` 未移动 |
 | 上位依据 | `AGENTS.md`、[`docs/updating.md`](../updating.md)、[`docs/deployment.md`](../deployment.md) |
 
 ---
@@ -179,6 +179,21 @@ XN_TEST_GOPROXY=https://goproxy.cn,direct ./scripts/tests/deploy-faults.test.sh
 
 > **声明：本记录未将任何未执行的测试标记为已通过。**
 
+### 4.4 发布后验证（已发布镜像）
+
+| 检查 | 结果 |
+| --- | --- |
+| CI（`main`，提交 `825f5bc`） | ✅ 成功（[run 40179651451](https://github.com/xiaowork-dev/xiaowork-nav/actions/runs/40179651451)） |
+| CI（标签 `v2.0.1`） | ✅ 成功（run 40179801765） |
+| Release 流水线 | ✅ 成功（[run 40179801770](https://github.com/xiaowork-dev/xiaowork-nav/actions/runs/40179801770)） |
+| GitHub Release | ✅ `v2.0.1` 已创建（非 draft、非 prerelease）：`https://github.com/xiaowork-dev/xiaowork-nav/releases/tag/v2.0.1` |
+| GHCR 镜像 | ✅ `ghcr.io/xiaowork-dev/xiaowork-nav:v2.0.1`，多架构 `linux/amd64` + `linux/arm64`，摘要 `sha256:4083919bd1c95614b62bc5a628cc26b113663991ec2ec47c4e3bd224739b37f6` |
+| 镜像标签 | ✅ `v2.0.1` / `v2.0` / `latest` 指向同一摘要 |
+| 匿名拉取 | ✅ `docker pull ghcr.io/xiaowork-dev/xiaowork-nav:v2.0.1` 成功（无需登录） |
+| 运行已发布镜像 | ✅ `/healthz` = `{"status":"ok","version":"v2.0.1"}`；`/api/v1/version` = `v2.0.1` / commit `825f5bc` / `schema_version=2`；容器非 root（`uid=100(app)`） |
+| 已发布镜像的 `--db-info` | ✅ 按脚本方式调用返回 `exists=true`、`schema_version=2`；不带路径保护时复现 MSYS 改写（`exists=false`），证明该修复在发布产物中生效 |
+| 历史标签 `v2.0.0` | ✅ **未移动**：`refs/tags/v2.0.0` 仍指向提交 `d18539d`，镜像摘要仍为 `sha256:c8e2151f…` |
+
 ---
 
 ## 5. 项目总体进度
@@ -199,11 +214,13 @@ XN_TEST_GOPROXY=https://goproxy.cn,direct ./scripts/tests/deploy-faults.test.sh
 | 项 | 内容 |
 | --- | --- |
 | 当前分支 | `main` |
-| 本次提交前的最近提交 | `c1cadd4` — `docs(p5): record the GitHub publication results` |
-| 本次提交内容 | 上述代码、脚本、测试、文档（同一提交纳入版本管理） |
+| 修复提交（代码 / 脚本 / 测试 / 文档） | `825f5bc` — `fix(deploy): harden update and rollback against failures`；其前一次提交为 `c1cadd4` |
+| 本记录（含 §4.4 发布验证）的更新提交 | 见 `git log`（docs 提交；不在此硬写自身 SHA） |
 | 远程 | `origin` → `https://github.com/xiaowork-dev/xiaowork-nav.git` |
-| 推送状态 | 见聊天总结与 `git log`（本文件不硬写提交 SHA 与推送结果） |
-| 历史标签 | `v2.0.0` **保持不变**（未移动、未重建） |
+| 推送状态 | ✅ 已推送：`c1cadd4..825f5bc main -> main`；`git ls-remote` 核验远程 `refs/heads/main` = `825f5bc` = 本地 HEAD |
+| 发布标签 | ✅ 已创建并推送附注标签 `v2.0.1`（标签对象 `e4c220d` → 提交 `825f5bc`） |
+| 历史标签 | `v2.0.0` **保持不变**（仍指向 `d18539d`，未移动、未重建） |
+| 提交身份 | 本地占位 `xiaowork-dev <xiaowork-dev@users.noreply.github.com>`（待用户替换） |
 
 ---
 
@@ -220,7 +237,7 @@ XN_TEST_GOPROXY=https://goproxy.cn,direct ./scripts/tests/deploy-faults.test.sh
 
 ## 8. 下一阶段计划
 
-1. 提交并推送 `main`，创建并推送标签 `v2.0.1`。
-2. 核验 CI、Release 流水线、GHCR 多架构镜像与匿名拉取。
-3. 用已发布的 `v2.0.1` 镜像做一次真实的 `latest`/固定版本升级验证。
-4. 在独立测试服务器完成 NPM 反代 HTTPS 部署验证。
+1. 用已发布的 `v2.0.1` 镜像做一次真实的 `latest` 与固定版本升级验证（在真实部署或测试机上）。
+2. 在独立测试服务器完成 NPM 反代 HTTPS 部署验证。
+3. 可选：清理 GHCR 遗留标签 `2.0.0` / `2.0`（P5 报告 §9.3）、替换占位提交身份。
+4. 规划下一版本增强项（`docs/requirements.md` §2）。

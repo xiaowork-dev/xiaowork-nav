@@ -1,9 +1,9 @@
 # 项目进度总览
 
-> 最后更新：2026-10-25 17:00（Asia/Shanghai）
+> 最后更新：2026-10-25 17:25（Asia/Shanghai）
 > 项目：XiaoWork Nav V2.0（版本 **2.0.1**）
-> 总体状态：**已发布** —— v2.0.0 已开源发布；v2.0.1 修复了 P5 验收复审发现的一键更新与
-> 数据库回滚缺陷，已通过真实 Docker 异常注入验证，待发布
+> 总体状态：**已发布** —— v2.0.0 已开源发布；**v2.0.1** 修复了 P5 验收复审发现的一键更新与
+> 数据库回滚缺陷，已通过真实 Docker 异常注入验证、CI/Release 流水线与 GHCR 多架构发布
 >
 > 交付规范见 [`../AGENTS.md`](../AGENTS.md)：每阶段必须产出 `docs/deliveries/P<N>-delivery.md`。
 
@@ -48,6 +48,8 @@
 | **v2.0.1 更新失败自动回滚** | 已完成 | 场景 6/7/8/12：启动失败、迁移后健康检查失败、结构版本不可读、NPM 模式失败均回滚并**再次验证**健康与数据 | [补充记录 §2.3](deliveries/20261025-170154-p5-update-rollback-fix.md) |
 | **v2.0.1 restore.sh 安全恢复** | 已完成 | 场景 10/11：启动前切换到快照版本；版本未知时拒绝启动并保持停止 | [补充记录 §2.4](deliveries/20261025-170154-p5-update-rollback-fix.md) |
 | **部署脚本异常注入测试** | 已完成 | `scripts/tests/deploy-faults.test.sh` 12 场景 / 43 断言全部通过（真实 Docker） | [补充记录 §4.2](deliveries/20261025-170154-p5-update-rollback-fix.md) |
+| **v2.0.1 提交、推送与发布** | 已完成 | 提交 `825f5bc` 已推送；CI（main/标签）与 Release 流水线成功；多架构镜像已推送 GHCR 且匿名拉取并运行通过；Release `v2.0.1` 已创建 | [补充记录 §4.4](deliveries/20261025-170154-p5-update-rollback-fix.md) |
+| 历史标签 `v2.0.0` 保持不变 | 已完成 | 标签仍指向 `d18539d`；镜像摘要仍为 `sha256:c8e2151f…` | [补充记录 §4.4](deliveries/20261025-170154-p5-update-rollback-fix.md) |
 
 ## 正在进行 / 未完成
 
@@ -59,8 +61,8 @@
 | 跨浏览器 / 真机触控 / 无障碍审计 | 未验证 | 后续版本 |
 | OpenAPI 规范级 lint / 前端类型自动生成 | 未接入 | 后续接入 CI |
 | 旧站真实数据的正式导入 | 已可在容器中导入 | 剩余 23 个占位图标见迁移报告 §13.5 |
-| v2.0.1 提交、推送与发布 | 待执行 | 提交推送 `main`、打标签 `v2.0.1`、核验 CI/Release/GHCR |
-| 用已发布镜像做一次真实 `latest` 升级验证 | 待 v2.0.1 镜像发布后执行 | 发布后在本机执行 `./scripts/update.sh latest` |
+| 用已发布镜像做一次真实 `latest` 升级验证 | 未执行 | 在测试机执行 `./scripts/update.sh latest` |
+| 真实 NPM 反代 HTTPS 端到端 | 未验证 | 在具备 NPM 与域名的环境完成 |
 
 ## 当前阻塞与风险
 
@@ -72,11 +74,10 @@
 
 ## 下一步（按优先级）
 
-1. 提交并推送 `main`，创建并推送标签 `v2.0.1`，核验 CI / Release / GHCR 匿名拉取。
-2. 用已发布的 `v2.0.1` 镜像做一次真实的 `latest` 与固定版本升级验证。
-3. 在独立测试服务器完成真实部署与 NPM 反代 HTTPS 验证。
-4. 可选：清理 GHCR 遗留标签、替换提交身份。
-5. 规划下一版本增强项（`docs/requirements.md` §2）。
+1. 用已发布的 `v2.0.1` 镜像做一次真实的 `latest` 与固定版本升级验证。
+2. 在独立测试服务器完成真实部署与 NPM 反代 HTTPS 验证。
+3. 可选：清理 GHCR 遗留标签、替换提交身份。
+4. 规划下一版本增强项（`docs/requirements.md` §2）。
 
 ## 最近交付记录
 
@@ -111,7 +112,17 @@
     版本 `v2.0.0`、`schema_version=2`。
   - **未执行**：NPM 反代与 HTTPS 实测、长期稳定性与并发、跨浏览器与真机。
 - 部署环境：本地 Docker Desktop（测试用临时数据目录，测试后已清理）；**未操作任何现有服务器**。
+- 发布验证（2026-10-25，v2.0.1）：
+  - 提交 `825f5bc` 已推送；CI（`main` run 40179651451、标签 run 40179801765）与 Release
+    流水线（run 40179801770）全部成功。
+  - GHCR：`ghcr.io/xiaowork-dev/xiaowork-nav:v2.0.1`（`linux/amd64` + `linux/arm64`），
+    摘要 `sha256:4083919b…`；`v2.0` / `latest` 同步指向该摘要。
+  - **匿名 `docker pull` 成功**；运行后 `/healthz` = `v2.0.1`、`/api/v1/version` = `v2.0.1` /
+    commit `825f5bc` / `schema_version=2`、容器非 root；已发布镜像的 `--db-info` 返回
+    `exists=true` / `schema_version=2`。
+  - GitHub Release `v2.0.1` 已创建（非 draft / 非 prerelease）。
+  - 历史标签 `v2.0.0` **未移动**（仍指向 `d18539d`，镜像摘要仍为 `sha256:c8e2151f…`）。
 - Git 信息：远程 `origin` → `https://github.com/xiaowork-dev/xiaowork-nav.git`；
-  分支 `main`；历史标签 `v2.0.0` **未移动、未重建**。提交身份为本地占位（待用户替换）。
+  分支 `main` = `825f5bc`（已推送，与远程一致）；标签 `v2.0.1` 已推送。提交身份为本地占位（待用户替换）。
 
 > 说明：本仓库当前使用本地占位提交身份（`xiaowork-dev <xiaowork-dev@users.noreply.github.com>`），可在配置 GitHub 远程时替换为用户真实身份。
