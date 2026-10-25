@@ -82,7 +82,7 @@ over the shared network. See [docs/installation.md](docs/installation.md).
 ## Updating
 
 ```bash
-./scripts/update.sh v2.0.1      # or: ./scripts/update.sh latest
+./scripts/update.sh v2.1.0      # or: ./scripts/update.sh latest
 ```
 
 The update script:

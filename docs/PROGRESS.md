@@ -1,9 +1,9 @@
 # 项目进度总览
 
-> 最后更新：2026-10-25 22:00（Asia/Shanghai）
+> 最后更新：2026-10-25 22:20（Asia/Shanghai）
 > 项目：XiaoWork Nav V2.0（版本 **2.1.0**）
-> 总体状态：**V2.1.0 开发完成，待发布** —— 三个核心功能（官方图标自动获取、PC 左侧分类栏、
-> 标签布局与一键切换）已实现并通过全量回归、真实数据兼容、真实浏览器与真实 Docker 升级/回滚验证
+> 总体状态：**已发布** —— v2.1.0 已完成开发、全量验证并发布：CI / Release 成功、GHCR 多架构镜像
+> 匿名可拉取、GitHub Release 已创建。**生产服务器升级等待用户确认。**
 >
 > 交付规范见 [`../AGENTS.md`](../AGENTS.md)：每阶段必须产出 `docs/deliveries/P<N>-delivery.md`。
 
@@ -50,6 +50,12 @@
 | **部署脚本异常注入测试** | 已完成 | `scripts/tests/deploy-faults.test.sh` 12 场景 / 43 断言全部通过（真实 Docker） | [补充记录 §4.2](deliveries/20261025-170154-p5-update-rollback-fix.md) |
 | **v2.0.1 提交、推送与发布** | 已完成 | 提交 `825f5bc` 已推送；CI（main/标签）与 Release 流水线成功；多架构镜像已推送 GHCR 且匿名拉取并运行通过；Release `v2.0.1` 已创建 | [补充记录 §4.4](deliveries/20261025-170154-p5-update-rollback-fix.md) |
 | 历史标签 `v2.0.0` 保持不变 | 已完成 | 标签仍指向 `d18539d`；镜像摘要仍为 `sha256:c8e2151f…` | [补充记录 §4.4](deliveries/20261025-170154-p5-update-rollback-fix.md) |
+| **V2.1.0 / P1 调研与架构** | ✅ 已完成 | 见 [V2.1.0 实施计划](development-plan-v2.1.md) | [P1 报告](deliveries/v2.1.0/P1-architecture.md) |
+| **V2.1.0 / P2 官方图标自动获取** | ✅ 已完成 | 迁移 0003、抓取与缓存、SSRF 加固、异步批量、后台 UI；真实数据补全 45/53 | [P2 报告](deliveries/v2.1.0/P2-icons.md) |
+| **V2.1.0 / P3 滚动布局左侧分类栏** | ✅ 已完成 | 侧栏、点击定位、滚动高亮（11 个单元测试）、折叠与三档响应式 | [P3 报告](deliveries/v2.1.0/P3-scroll-layout.md) |
+| **V2.1.0 / P4 标签布局与一键切换** | ✅ 已完成 | 标签布局、切换控件、偏好持久化、主题与布局独立 | [P4 报告](deliveries/v2.1.0/P4-tabs-layout.md) |
+| **V2.1.0 / P5 集成测试与发布** | ✅ 已完成 | 14 个异常注入场景、真实数据兼容、Docker 权限修复、v2.0.1→v2.1.0 升级/回滚、完整截图、发布 v2.1.0 | [P5 报告](deliveries/v2.1.0/P5-release.md) |
+| **v2.1.0 发布核验** | ✅ 已完成 | CI/Release 成功；`ghcr.io/.../v2.1.0`（amd64+arm64）匿名拉取并运行；Release `v2.1.0` 已创建 | [P5 报告 §10.1](deliveries/v2.1.0/P5-release.md) |
 
 ## 正在进行 / 未完成
 
@@ -75,18 +81,19 @@
 
 ## 下一步（按优先级）
 
-1. 用已发布的 `v2.0.1` 镜像做一次真实的 `latest` 与固定版本升级验证。
+1. **等待用户确认后升级生产服务器到 v2.1.0**（指令见 [P5 报告 §12](deliveries/v2.1.0/P5-release.md)）。
 2. 在独立测试服务器完成真实部署与 NPM 反代 HTTPS 验证。
-3. 可选：清理 GHCR 遗留标签、替换提交身份。
-4. 规划下一版本增强项（`docs/requirements.md` §2）。
+3. 可选：清理 GHCR 遗留标签 `2.0.0`/`2.0`、替换占位提交身份。
+4. 规划下一版本增强项（标签模式"常用网站"、图标清理工具、跨浏览器验证）。
 
 ## 最近交付记录
 
-- **[V2.1.0 实施计划](development-plan-v2.1.md)**（当前版本计划）
+- **[V2.1.0 / P5 阶段交付报告：集成测试、部署修复与版本发布](deliveries/v2.1.0/P5-release.md)**（含生产升级指令）
 - **[V2.1.0 / P4 阶段交付报告：标签布局与一键切换](deliveries/v2.1.0/P4-tabs-layout.md)**
 - **[V2.1.0 / P3 阶段交付报告：PC 端滚动布局左侧分类栏](deliveries/v2.1.0/P3-scroll-layout.md)**
 - **[V2.1.0 / P2 阶段交付报告：官方图标自动获取](deliveries/v2.1.0/P2-icons.md)**
-- **[V2.1.0 / P1 阶段交付报告](deliveries/v2.1.0/P1-architecture.md)**
+- **[V2.1.0 / P1 阶段交付报告：调研与架构](deliveries/v2.1.0/P1-architecture.md)**
+- **[V2.1.0 实施计划](development-plan-v2.1.md)**
 - **[P5 阶段交付报告](deliveries/P5-delivery.md)**（正式归档，含 §12 v2.0.1 补充）
 - **[P5 补充交付记录：一键更新与回滚修复（v2.0.1）](deliveries/20261025-170154-p5-update-rollback-fix.md)**
 - **[P4 阶段交付报告](deliveries/P4-delivery.md)**（正式归档）
@@ -118,6 +125,21 @@
     版本 `v2.0.0`、`schema_version=2`。
   - **未执行**：NPM 反代与 HTTPS 实测、长期稳定性与并发、跨浏览器与真机。
 - 部署环境：本地 Docker Desktop（测试用临时数据目录，测试后已清理）；**未操作任何现有服务器**。
+- v2.1.0 验证（2026-10-25）：
+  - 后端 `go build` / `go vet` / `go test` **115 通过 / 0 失败**；前端 `npm run test` **21 通过 / 0 失败**；
+    前端构建、`bash -n`、OpenAPI YAML、Compose 配置（独立 + NPM）全部通过。
+  - **部署异常注入**：`scripts/tests/deploy-faults.test.sh` **14 个场景 / 57 个断言全部通过**
+    （含"从发布的 v2.0.1 升级，结构 2→3 且数据与手动图标保留"与"只读数据目录快速失败"）。
+  - **真实数据兼容**：导入 10 分类 / 110 站点；31 个内嵌 SVG 转本地图标、19 个外链保留、4 个 Simple Icons；
+    批量补全 **45 成功 / 8 失败**（失败均带原因），**57 个手动图标全部未被改动**；缓存文件 31 → 76。
+  - **浏览器验收**：真实数据 + 真实前后端，覆盖 1440 / 834 / 390 / 375 与深浅主题、两种布局、
+    侧栏展开/折叠、后台图标管理；主题与布局互不影响；两种布局数据一致；无 JS 错误。
+  - **发布核验**：CI 与 Release 流水线成功；`ghcr.io/xiaowork-dev/xiaowork-nav:v2.1.0`（amd64 + arm64）
+    **匿名拉取成功**，运行后 `/healthz` = v2.1.0、`/api/v1/version` = `v2.1.0` / `schema_version=3`、
+    容器非 root；`--db-info` 返回 `schema_version=3`；GitHub Release `v2.1.0` 已创建；
+    历史镜像 `v2.0.0` / `v2.0.1` 摘要未变。
+  - **未执行**：生产服务器升级（等待用户确认）、真实 NPM 反代与 HTTPS 端到端、
+    跨浏览器（Firefox/Safari）、真机触控与无障碍审计、长期稳定性与并发。
 - 发布验证（2026-10-25，v2.0.1）：
   - 提交 `825f5bc` 已推送；CI（`main` run 40179651451、标签 run 40179801765）与 Release
     流水线（run 40179801770）全部成功。

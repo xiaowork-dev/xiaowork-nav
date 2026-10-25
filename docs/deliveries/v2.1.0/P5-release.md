@@ -192,9 +192,24 @@
 | --- | --- |
 | 本阶段起点 | `4c13fe8`（`feat(layout): add a tabs layout with one-click switching`） |
 | 本阶段提交 | 见聊天总结与 `git log`（本文件不硬写自身提交 SHA） |
-| 推送 | 已推送 `origin/main` |
-| 发布标签 | `v2.1.0`（附注标签） |
-| 历史标签 | `v2.0.0` / `v2.0.1` 未移动、未重建 |
+| 推送 | ✅ 已推送 `origin/main` |
+| 发布标签 | ✅ `v2.1.0`（附注标签） |
+| 历史标签 | ✅ `v2.0.0`（`d18539d`）/ `v2.0.1`（`825f5bc`）**未移动、未重建** |
+
+### 10.1 发布验证（2026-10-25）
+
+| 检查 | 结果 |
+| --- | --- |
+| CI（`main`） | ✅ 成功（run 40201420093） |
+| CI（标签 `v2.1.0`） | ✅ 成功 |
+| Release 流水线 | ✅ 成功（[run 40201578595](https://github.com/xiaowork-dev/xiaowork-nav/actions/runs/40201578595)） |
+| GitHub Release | ✅ `v2.1.0` 已创建（非 draft / 非 prerelease）：`https://github.com/xiaowork-dev/xiaowork-nav/releases/tag/v2.1.0` |
+| GHCR 镜像 | ✅ `ghcr.io/xiaowork-dev/xiaowork-nav:v2.1.0`，`linux/amd64` + `linux/arm64`，摘要 `sha256:7a87f947…` |
+| 镜像标签 | ✅ `v2.1.0` / `v2.1` / `latest` 指向同一摘要 |
+| 匿名拉取 | ✅ `docker pull ghcr.io/xiaowork-dev/xiaowork-nav:v2.1.0` 成功（无需登录） |
+| 运行已发布镜像 | ✅ `/healthz` = `{"status":"ok","version":"v2.1.0"}`；`/api/v1/version` = `v2.1.0` / commit `42b2861` / **`schema_version=3`**；容器非 root（`uid=100(app)`） |
+| 已发布镜像的 `--db-info` | ✅ 返回 `exists=true`、`schema_version=3` |
+| 历史镜像 | ✅ `v2.0.0` 仍为 `sha256:c8e2151f…`、`v2.0.1` 仍为 `sha256:4083919b…` |
 
 ## 11. 遗留问题
 
