@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+import LayoutSwitcher from '@/components/LayoutSwitcher.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSiteStore } from '@/stores/site'
 import { useToast, errorMessage } from '@/composables/useToast'
 import { useTheme } from '@/composables/useTheme'
+
+withDefaults(defineProps<{ showLayoutSwitcher?: boolean }>(), {
+  showLayoutSwitcher: false,
+})
 
 const auth = useAuthStore()
 const site = useSiteStore()
@@ -35,6 +40,7 @@ async function signOut(): Promise<void> {
     </RouterLink>
 
     <div class="header-actions">
+      <LayoutSwitcher v-if="showLayoutSwitcher" />
       <button type="button" class="btn btn--sm" :title="`切换主题（当前：${themeLabel}）`" @click="toggleTheme">
         {{ current === 'dark' ? '🌙' : '☀️' }} {{ themeLabel }}
       </button>

@@ -215,6 +215,129 @@ img {
   gap: 8px;
 }
 
+/* ---------- layout switcher ---------- */
+
+.layout-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.layout-switch__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-sub);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.layout-switch__item:hover { color: var(--text-main); }
+
+.layout-switch__item.is-active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--accent-contrast);
+}
+
+/* ---------- tabs layout ---------- */
+
+/* Tabs mode gets its own background layering, still built from the theme
+   tokens (no third-party images). */
+.page--tabs {
+  background-image:
+    radial-gradient(ellipse 780px 460px at 50% -12%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 68%);
+  background-repeat: no-repeat;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.tabs-hero {
+  padding-top: 6px;
+}
+
+.tabs-hero .search {
+  margin-bottom: 22px;
+}
+
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 18px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar { display: none; }
+
+.tabs__item {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-sub);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition), border-color var(--transition), transform var(--transition);
+}
+
+.tabs__item:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+  color: var(--text-main);
+}
+
+.tabs__item.is-active {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--accent-contrast);
+  box-shadow: var(--shadow-card);
+}
+
+.tabs__icon { font-size: 0.9rem; line-height: 1; }
+
+.tabs__count {
+  font-size: 0.7rem;
+  font-weight: 700;
+  opacity: 0.75;
+}
+
+.tabs-panel__head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 16px;
+}
+
+.tabs-panel__title {
+  margin: 0;
+  font-size: 1.06rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
 /* ---------- buttons ---------- */
 
 .btn {
@@ -1140,6 +1263,14 @@ img {
 
   .category { margin-bottom: 22px; }
   .category__title { font-size: 0.94rem; }
+
+  /* The layout switcher keeps only its icons on narrow screens. */
+  .layout-switch__label { display: none; }
+  .layout-switch__item { padding: 0 9px; }
+
+  .tabs { margin-bottom: 14px; }
+  .tabs__item { min-height: 34px; padding: 0 11px; font-size: 0.82rem; }
+  .tabs-panel__title { font-size: 0.98rem; }
 
   /* Admin rows: name/count on top, actions on their own line. */
   .list-item {

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { getNavigation } from '@/api/public'
+import { applyLayout } from '@/composables/useLayout'
 import { applyTheme } from '@/composables/useTheme'
 import type { Category, PublicSettings } from '@/types/api'
 
@@ -21,7 +22,9 @@ export const useSiteStore = defineStore('site', () => {
       settings.value = nav.settings
       categories.value = nav.categories
       loaded.value = true
+      // Theme and layout are independent preferences; a local choice wins.
       applyTheme(nav.settings.theme)
+      applyLayout(nav.settings.homepage_layout)
     } catch (e) {
       error.value = e instanceof Error ? e.message : String(e)
     } finally {
