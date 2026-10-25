@@ -15,7 +15,7 @@
 | 阶段目标 | 让其他用户可以方便地安装、升级与维护：开源准备、一键部署、版本发布与更新、真实环境部署验证 |
 | 阶段开始日期 | 2026-10-25 |
 | 阶段完成日期 | 2026-10-25 |
-| 当前完成状态 | **代码与部署工件已完成并在真实 Docker 环境验证**；**GitHub 仓库创建与推送、GHCR 镜像发布未完成**（缺少远程与凭据，需用户执行，详见第 9 节） |
+| 当前完成状态 | **全部完成**：代码与部署工件已在真实 Docker 环境验证；GitHub 仓库已创建并推送；CI 通过；多架构镜像已发布到 GHCR（匿名可拉取）；GitHub Release 已创建 |
 | 上位依据 | `AGENTS.md`、`docs/installation.md`、`docs/updating.md` |
 
 ---
@@ -145,14 +145,12 @@
 
 | 未执行项 | 原因 |
 | --- | --- |
-| **GitHub Actions 实际运行** | 本地无法运行 Actions；未创建远程仓库。工作流仅通过 YAML 语法与步骤审查 |
-| **GHCR 镜像发布与拉取** | 未配置 GitHub 远程与凭据，未推送 |
-| **多架构（arm64）镜像** | 本机为 amd64，buildx 多架构推送依赖 CI |
 | **NPM 反向代理端到端** | 环境无 Nginx Proxy Manager 实例；仅验证了 `compose.npm.yaml` 配置有效性 |
 | **真实 HTTPS / 域名** | 无公网域名与证书 |
 | **长期运行与并发压力** | 未做 |
 | **Windows 原生（非 Docker）部署** | 目标平台为 Linux 容器 |
 
+> GitHub Actions（CI 与 Release）已在本次发布中**实际运行并通过**，见第 9 节。
 > **声明：本报告未将任何未执行的测试标记为已通过。**
 
 ---
@@ -165,7 +163,7 @@
 | P2 | Go 后端核心业务开发 | ✅ 已完成 |
 | P3 | Vue 3 前端功能开发与联调（含旧站迁移） | ✅ 已完成 |
 | P4 | UI、交互与主题优化（含收尾修复） | ✅ 已完成 |
-| **P5** | **Docker 部署、GitHub 开源与版本发布** | 🟡 **代码与部署工件完成并实测；仓库创建/推送/镜像发布待用户执行** |
+| **P5** | **Docker 部署、GitHub 开源与版本发布** | ✅ **已完成**（仓库、CI、多架构镜像、Release 均已发布并核验） |
 
 ---
 
@@ -175,13 +173,14 @@
 
 | 项 | 内容 |
 | --- | --- |
-| 当前分支 | `master` |
-| 本报告提交前的最近提交 | `ee7e7c8` — `fix(frontend): P4 wrap-up - mobile admin layout, paging and sort mode` |
-| 提交总数 | 8 |
+| 当前分支 | `main`（原 `master`，推送前重命名） |
+| 本报告提交前的最近提交 | `d18539d` — `ci(release): keep the v prefix on image tags` |
+| 提交总数 | 11 |
 | 提交身份 | 本仓库本地占位：`xiaowork-dev <xiaowork-dev@users.noreply.github.com>` |
-| 是否配置 GitHub 远程 | **否**（`git remote -v` 无输出） |
-| 是否已完成推送 | **否** |
-| 是否创建 Release / 打标签 | **否** |
+| GitHub 远程 | ✅ `origin` → `https://github.com/xiaowork-dev/xiaowork-nav.git` |
+| 是否已完成推送 | ✅ `main` 与标签 `v2.0.0` 均已推送；`git ls-remote` 核验远程 HEAD = 本地 HEAD |
+| 是否创建 Release | ✅ `v2.0.0`（Latest） |
+| 是否发布镜像 | ✅ `ghcr.io/xiaowork-dev/xiaowork-nav:v2.0.0`（amd64 + arm64，匿名可拉取） |
 
 ---
 
@@ -189,9 +188,11 @@
 
 | 项 | 值 | 状态 |
 | --- | --- | --- |
-| GitHub 仓库 | `https://github.com/xiaowork-dev/xiaowork-nav`（**尚未创建**） | ⏳ 待用户创建 |
-| Docker 镜像 | `ghcr.io/xiaowork-dev/xiaowork-nav:v2.0.0`（**尚未发布**） | ⏳ 待 CI 发布 |
-| 本地镜像 | `xiaowork-nav:2.0.0`（36.2 MB，已实测） | ✅ 可用 |
+| GitHub 仓库 | `https://github.com/xiaowork-dev/xiaowork-nav` | ✅ **已创建并推送**（公开） |
+| GitHub Release | `https://github.com/xiaowork-dev/xiaowork-nav/releases/tag/v2.0.0` | ✅ 已发布（Latest） |
+| Docker 镜像 | `ghcr.io/xiaowork-dev/xiaowork-nav:v2.0.0` | ✅ **已发布且匿名可拉取** |
+| 镜像标签 | `v2.0.0`、`v2.0`、`latest` | ✅ 多架构 `linux/amd64` + `linux/arm64` |
+| 镜像摘要 | `sha256:c8e2151f22e368d28e0016742f2aabeb8d15418fce2ec4b115485813a2ae24ee` | ✅ 已实测拉取并运行 |
 
 ### 一键安装命令
 
@@ -199,13 +200,6 @@
 git clone https://github.com/xiaowork-dev/xiaowork-nav.git
 cd xiaowork-nav
 ./scripts/install.sh
-```
-
-在远程仓库与镜像发布前，可先用本地镜像验证：
-
-```bash
-git clone <仓库或本地路径> && cd xiaowork-nav
-./scripts/install.sh --build          # 本地构建并安装
 ```
 
 ### 一键更新命令
@@ -227,21 +221,20 @@ git clone <仓库或本地路径> && cd xiaowork-nav
 
 ## 8. 遗留问题与风险
 
-### 8.1 未完成的任务（需用户执行）
+### 8.1 未完成的任务
 
 | 任务 | 说明 |
 | --- | --- |
-| 创建 GitHub 仓库 | `xiaowork-dev/xiaowork-nav`（公开或私有） |
-| 配置远程并推送 | `git remote add origin …` + `git push -u origin master` |
-| 打标签并发布 | `git tag v2.0.0 && git push origin v2.0.0`，由 Actions 发布镜像与 Release |
-| 确认 GHCR 包可见性 | 首次推送后需在 GitHub 设置中确认包为 public（若需匿名拉取） |
-| 在服务器上正式部署 | 未操作任何现有服务器 |
+| 独立测试服务器上的真实部署 + NPM 反代 HTTPS | 环境无 NPM 实例与公网域名 |
+| 清理 GHCR 遗留标签 `2.0.0` / `2.0` | 见 §9.3，可选且非阻塞 |
+| 跨浏览器 / 真机触控 / 无障碍审计 | 见 P4 报告 |
+| 替换占位提交身份 | 用户提供真实 Git 身份后更新 |
 
 ### 8.2 已知问题
 
 | 问题 | 影响 | 处理建议 |
 | --- | --- | --- |
-| 未创建远程仓库 | 无法推送、无法运行 CI、无镜像 | 由用户创建后执行第 9 节步骤 |
+| GHCR 遗留标签 `2.0.0` / `2.0` | 与规范标签并存，可能造成混淆 | 见 §9.3，可在包管理页一键删除 |
 | `golang` 模块代理在受限网络下不可达 | 本地/离线构建镜像失败 | 构建时传 `--build-arg GOPROXY=<镜像源>,direct`（已在 Dockerfile 注释说明） |
 | 提交身份为占位 | 提交作者信息不真实 | 用户提供后替换并 rebase，或后续提交使用真实身份 |
 | 部分站点图标依赖第三方 | 23 个站点显示首字母、4 个第三方 Favicon 内容透明 | 见迁移报告 §13.5 |
@@ -249,36 +242,65 @@ git clone <仓库或本地路径> && cd xiaowork-nav
 
 ### 8.3 尚未验证的功能
 
-- GitHub Actions 实际执行（CI 与 Release）。
-- GHCR 镜像推送、拉取与多架构。
 - Nginx Proxy Manager 真实反代与 HTTPS。
 - 生产规模下的长期稳定性与并发。
+- 真机触控与跨浏览器渲染（见 P4 报告）。
 
 ---
 
-## 9. 需要你完成的操作（未完成部分）
+## 9. GitHub 发布执行记录（已完成）
 
-在远程仓库与凭据就绪前，我**不会也不能**声称推送成功。请执行：
+仓库由用户在浏览器中登录后创建，随后由我完成推送与发布。
 
-```bash
-# 1) 在 GitHub 创建仓库 xiaowork-dev/xiaowork-nav（不要初始化 README）
-# 2) 关联远程并推送（本地已有完整提交历史）
-cd xiaowork-nav
-git remote add origin https://github.com/xiaowork-dev/xiaowork-nav.git
-git branch -M main
-git push -u origin main
+### 9.1 实际执行结果
 
-# 3) 触发首次发布（Actions 会构建多架构镜像、推送 GHCR 并创建 Release）
-git tag v2.0.0
-git push origin v2.0.0
+| 步骤 | 结果 |
+| --- | --- |
+| 创建仓库 | ✅ `xiaowork-dev/xiaowork-nav`（Public，未初始化任何文件） |
+| 关联远程 | ✅ `origin` → `https://github.com/xiaowork-dev/xiaowork-nav.git` |
+| 重命名分支 | ✅ `master` → `main` |
+| 推送主分支 | ✅ `main` → `origin/main`（远程与本地 HEAD 一致） |
+| 打标签并推送 | ✅ `v2.0.0`（附注标签） |
+| CI（main） | ✅ 成功（2m 2s） |
+| CI（tag） | ✅ 成功（1m 21s） |
+| Release 流水线 | ✅ 成功，构建 `linux/amd64` + `linux/arm64` 并推送 GHCR |
+| GitHub Release | ✅ `v2.0.0` 已创建（标记 Latest） |
+| 匿名拉取镜像 | ✅ `docker pull ghcr.io/xiaowork-dev/xiaowork-nav:v2.0.0`（36.2 MB） |
+| 运行已发布镜像 | ✅ `/healthz` = ok，`/api/v1/version` = `v2.0.0` / `schema_version=2` |
 
-# 4) 推送后确认
-#    - Actions 中 CI 与 Release 均通过
-#    - GHCR 出现 ghcr.io/xiaowork-dev/xiaowork-nav:v2.0.0 与 latest
-#    - Release 页面出现 v2.0.0 及发行说明
-```
+Release 流水线各任务耗时：
 
-若需要我改为使用不同的组织/仓库名，请告知；`deploy/.env.example` 与文档中的镜像地址需同步更新。
+| 任务 | 耗时 |
+| --- | --- |
+| Verify before publishing | 24s |
+| Build amd64 | 1m 44s |
+| **Build arm64（原生 runner）** | **1m 11s** |
+| Publish multi-arch manifest | 22s |
+| Create GitHub Release | 5s |
+
+### 9.2 发布过程中发现并修复的两个问题
+
+| 问题 | 现象 | 修复 |
+| --- | --- | --- |
+| **QEMU 构建 arm64 极慢** | 首次 Release 运行 48 分钟仍未完成（纯 Go SQLite 驱动代码量巨大） | 改为矩阵构建：amd64 用 `ubuntu-latest`、arm64 用 `ubuntu-24.04-arm` **原生 runner**，按 digest 推送后合并为多架构清单。arm64 从 >48 分钟降到 **1m 11s** |
+| **镜像标签缺少 `v` 前缀** | `docker/metadata-action` 的 semver 模式会去掉 `v`，实际标签为 `2.0.0`/`2.0`，而 git 标签、README、Release 说明、`deploy/.env.example` 都写 `v2.0.0`，导致 `docker pull ...:v2.0.0` 与 `APP_VERSION=v2.0.0` 失败 | 标签模式改为 `v{{version}}` / `v{{major}}.{{minor}}`，使镜像标签与所有文档一致 |
+
+### 9.3 遗留的清理项（可选，非阻塞）
+
+首次发布尝试产生了 `2.0.0` 与 `2.0` 两个标签（指向更早一次构建的同一版本代码，仅内嵌 commit 不同）。
+规范标签为 `v2.0.0` / `v2.0` / `latest`。后续发布不会再产生无 `v` 前缀的标签。
+
+如需清理：打开 `https://github.com/users/xiaowork-dev/packages/container/xiaowork-nav/versions`，
+删除摘要以 `cf6040d5` 开头的那一条即可。
+
+### 9.4 本次新增提交
+
+| 提交 | 说明 |
+| --- | --- |
+| `a4e773c` | 每个架构使用原生 runner 构建 |
+| `d18539d` | 镜像标签保留 `v` 前缀 |
+
+> 推送与发布均已通过 `git ls-remote`、GitHub Actions 运行记录与匿名 `docker pull` 三重核验，**未虚构任何结果**。
 
 ---
 
@@ -299,10 +321,10 @@ git push origin v2.0.0
 
 ## 11. 下一步
 
-1. 你创建远程仓库并推送（第 9 节）。
-2. CI/Release 首次运行后确认镜像与 Release 可用。
-3. 在一台**独立测试服务器**上按 `docs/installation.md` 完成一次真实部署与 NPM 反代验证。
-4. 反馈后进入后续版本（P1 增强项：多主题、书签导入、PWA 等，见 `docs/requirements.md` §2）。
+1. 在一台**独立测试服务器**上按 `docs/installation.md` 完成一次真实部署与 NPM 反代 HTTPS 验证。
+2. 可选：清理 GHCR 遗留标签（§9.3）。
+3. 可选：提供真实 Git 提交身份，替换本地占位身份。
+4. 进入后续版本（P1 增强项：多主题、书签导入、PWA 等，见 `docs/requirements.md` §2）。
 
 ---
 
@@ -311,4 +333,5 @@ git push origin v2.0.0
 - 代码与文件：仓库实际文件（2026-10-25）。
 - Docker 测试：`docker build`、`docker compose up/down`、`scripts/*.sh`、HTTP 接口的实际输出（见 4.2）。
 - 测试记录：`go test -count=1 ./...`、`npm run build`、`bash -n`、`docker compose config` 的实际输出。
-- Git 状态：`git log` / `git status` / `git remote` 实际输出（见第 6 节）。
+- GitHub 发布：`git ls-remote`、GitHub Actions 运行记录（`/actions/runs/*`）、匿名 `docker pull` 与已发布镜像的运行时输出（见第 9 节）。
+- Git 状态：`git log` / `git status` / `git remote -v` 实际输出（见第 6 节）。
