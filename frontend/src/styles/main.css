@@ -598,6 +598,174 @@ img {
   text-align: center;
 }
 
+/* ---------- scroll layout: category rail + chips ---------- */
+
+.scroll-layout__body {
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 26px;
+  align-items: start;
+}
+
+.scroll-layout__content {
+  min-width: 0;
+}
+
+/* Keep the grid column in step with the collapsed rail. */
+.scroll-layout__body.is-collapsed {
+  grid-template-columns: 64px minmax(0, 1fr);
+}
+
+.sidebar {
+  position: sticky;
+  /* Clears the page header so the rail never hides behind it. */
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 32px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  overflow: hidden;
+}
+
+.sidebar--collapsed {
+  width: 64px;
+}
+
+.sidebar__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 8px 8px 6px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.sidebar__title {
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+.sidebar__toggle {
+  min-width: 30px;
+  padding: 0 8px;
+  font-size: 0.9rem;
+}
+
+.sidebar__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-sub);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.sidebar__item:hover {
+  background: var(--surface-strong);
+  color: var(--text-main);
+}
+
+.sidebar__item.is-active {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--text-main);
+}
+
+.sidebar__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-strong) 80%, transparent);
+  font-size: 0.78rem;
+  line-height: 1;
+}
+
+.sidebar__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar__count {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+/* The chip bar is the narrow-screen replacement for the rail. */
+.chipbar {
+  display: none;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 8px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chipbar::-webkit-scrollbar { display: none; }
+
+.chipbar__item {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-strong);
+  color: var(--text-sub);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chipbar__item.is-active {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--accent-contrast);
+}
+
+/* The anchor offset keeps a jumped-to heading clear of the viewport edge. */
+.category[data-category-id] {
+  scroll-margin-top: 20px;
+}
+
 /* ---------- admin ---------- */
 
 .admin {
@@ -911,6 +1079,13 @@ img {
 
 /* ---------- responsive ---------- */
 
+@media (max-width: 1080px) {
+  /* Narrow desktop / tablet: the rail becomes an icon-only strip. */
+  .scroll-layout__body { grid-template-columns: 64px minmax(0, 1fr); }
+  .sidebar { width: 64px; }
+  .sidebar__item { justify-content: center; padding: 7px 4px; }
+}
+
 @media (max-width: 1000px) {
   .admin { grid-template-columns: 1fr; }
 
@@ -934,6 +1109,22 @@ img {
   }
 
   .page { padding-bottom: 48px; }
+
+  /* Phone: no fixed rail; a sticky chip bar handles category jumping. */
+  .scroll-layout__body { display: block; }
+  .scroll-layout__sidebar { display: none; }
+
+  .chipbar {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    margin: 0 0 14px;
+    padding: 8px 0;
+    background: color-mix(in srgb, var(--bg-base) 78%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
 
   .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .tile { width: 100%; }

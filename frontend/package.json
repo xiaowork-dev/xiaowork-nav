@@ -10,6 +10,8 @@
     "build:only": "vite build",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "gen:types": "openapi-typescript ../docs/openapi/openapi.yaml -o src/types/openapi.d.ts",
     "mock": "prism mock ../docs/openapi/openapi.yaml -p 8080"
   },
@@ -24,6 +26,7 @@
     "openapi-typescript": "^7.5.0",
     "typescript": "~5.7.2",
     "vite": "^6.0.7",
+    "vitest": "^2.1.8",
     "vue-tsc": "^2.2.0"
   }
 }
