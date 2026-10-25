@@ -8,6 +8,7 @@
 | 文档 | 内容 |
 | --- | --- |
 | [development-plan-v2.md](development-plan-v2.md) | 调整后的五阶段开发计划（后端优先） |
+| [development-plan-v2.1.md](development-plan-v2.1.md) | **V2.1.0 实施计划（图标自动获取 / 滚动布局侧栏 / 标签布局）** |
 | [requirements.md](requirements.md) | 需求清单（P0/P1）与访问模型 |
 | [legacy-analysis.md](legacy-analysis.md) | 旧站视觉/交互参考与迁移假设 |
 | [architecture.md](architecture.md) | 总体架构、前后端模块边界、目录结构 |
@@ -64,5 +65,6 @@
 | [deliveries/P3-delivery.md](deliveries/P3-delivery.md) | **P3 阶段交付报告（正式归档）** |
 | [deliveries/P4-delivery.md](deliveries/P4-delivery.md) | **P4 阶段交付报告（正式归档）** |
 | [deliveries/P5-delivery.md](deliveries/P5-delivery.md) | **P5 阶段交付报告（正式归档，含 §12 v2.0.1 补充）** |
+| [deliveries/v2.1.0/](deliveries/v2.1.0/) | **V2.1.0 阶段交付报告（P1 起）** |
 | [deliveries/20261025-170154-p5-update-rollback-fix.md](deliveries/20261025-170154-p5-update-rollback-fix.md) | **P5 补充交付记录：一键更新与回滚修复（v2.0.1）** |
 | [deliveries/](deliveries/) | 过程记录与后续阶段交付报告 |
