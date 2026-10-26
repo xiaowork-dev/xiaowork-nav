@@ -44,16 +44,14 @@
   --shadow-soft: 0 18px 48px rgba(10, 12, 44, 0.32);
   --shadow-card: 0 10px 26px rgba(10, 12, 44, 0.24);
 
-  /* Category rail: a low-saturation, dark translucent purple-black column that
-     reads as page chrome rather than a floating card. */
-  --rail-bg: rgba(19, 15, 42, 0.62);
+  /* Category rail: a low-opacity layer over the page gradient (never a solid
+     slab of its own colour), so it reads as part of the same surface. */
+  --rail-bg: rgba(14, 12, 34, 0.30);
   --rail-border: rgba(255, 255, 255, 0.07);
-  --rail-text: rgba(255, 255, 255, 0.74);
-  --rail-text-active: #ffffff;
-  --rail-text-dim: rgba(255, 255, 255, 0.42);
   --rail-hover: rgba(255, 255, 255, 0.06);
-  --rail-active: rgba(124, 108, 255, 0.20);
+  --rail-active: rgba(124, 108, 255, 0.17);
   --rail-chip: rgba(255, 255, 255, 0.07);
+  --rail-scroll-thumb: rgba(255, 255, 255, 0.16);
 }
 
 :root[data-theme='light'] {
@@ -88,17 +86,14 @@
   --shadow-soft: 0 16px 40px rgba(74, 70, 148, 0.14);
   --shadow-card: 0 8px 22px rgba(74, 70, 148, 0.1);
 
-  /* The rail stays a dark purple-black column in the light theme too, so the
-     page shell keeps the same identity; it is slightly more opaque to hold its
-     contrast against the light gradient. */
-  --rail-bg: rgba(26, 21, 58, 0.90);
-  --rail-border: rgba(255, 255, 255, 0.08);
-  --rail-text: rgba(255, 255, 255, 0.78);
-  --rail-text-active: #ffffff;
-  --rail-text-dim: rgba(255, 255, 255, 0.46);
-  --rail-hover: rgba(255, 255, 255, 0.07);
-  --rail-active: rgba(146, 130, 255, 0.26);
-  --rail-chip: rgba(255, 255, 255, 0.09);
+  /* Same idea in the light theme: a light frosted layer on the light gradient.
+     A dark block here would clash with the rest of the page. */
+  --rail-bg: rgba(255, 255, 255, 0.42);
+  --rail-border: rgba(74, 70, 148, 0.10);
+  --rail-hover: rgba(74, 70, 148, 0.05);
+  --rail-active: rgba(90, 72, 234, 0.12);
+  --rail-chip: rgba(74, 70, 148, 0.07);
+  --rail-scroll-thumb: rgba(74, 70, 148, 0.18);
 }
 
 :root {
@@ -110,9 +105,12 @@
   --tile-gap-x: 26px;
   --tile-gap-y: 20px;
   --transition: 150ms ease;
-  /* Category rail widths (expanded / icon-only). */
+  /* Application shell: one horizontal rhythm for the top bar and the content. */
   --rail-width: 212px;
   --rail-width-collapsed: 60px;
+  --rail-inset: 12px;
+  --shell-topbar-h: 64px;
+  --shell-gutter: clamp(14px, 2.4vw, 40px);
 }
 
 /* ---------- base ---------- */
@@ -233,6 +231,28 @@ img {
   height: 26px;
   object-fit: contain;
   border-radius: 7px;
+}
+
+/* Fallback mark used when the site has no favicon configured. */
+.brand__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--accent-contrast);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.brand__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .header-actions {
@@ -747,13 +767,14 @@ img {
   text-align: center;
 }
 
-/* ---------- scroll layout: full-height category rail + chips ---------- */
+/* ---------- scroll layout: unified application shell ---------- */
 
 /*
- * The scroll layout breaks out of the centred page container so the rail can
- * sit on the real page edge: the shell is full width, the header keeps its own
- * centred container, and the content column re-centres itself in the space the
- * rail leaves over.
+ * One grid for the whole page: a fixed rail column and a main column that takes
+ * the remaining width. Nothing is re-centred inside the main column, so the rail
+ * and the content keep a single constant relationship at every viewport width
+ * (an earlier version centred a 1200px container in the main column, which left
+ * up to 250px of dead space between the rail and the content).
  */
 .page--rail {
   width: 100%;
@@ -761,45 +782,51 @@ img {
   padding: 0;
 }
 
-.page--rail .site-header {
-  width: min(100%, var(--page-width));
-  margin: 0 auto;
-  padding: 18px clamp(14px, 3.4vw, 40px) 14px;
-}
-
-.rail-layout {
+.shell {
   display: grid;
   grid-template-columns: var(--rail-width) minmax(0, 1fr);
-  align-items: start;
+  align-items: stretch;
+  min-height: 100vh;
 }
 
-.rail-layout.is-collapsed {
+.shell.is-collapsed {
   grid-template-columns: var(--rail-width-collapsed) minmax(0, 1fr);
 }
 
-.rail-main {
-  min-width: 0;
+.shell--norail {
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.rail-main__inner {
-  width: min(100%, var(--page-width));
-  margin: 0 auto;
-  padding: 8px clamp(14px, 3.4vw, 40px) 64px;
-}
+/* --- rail: a translucent layer over the page background ------------------- */
 
-/* The rail itself: a flat column on the page edge, not a floating card. */
 .rail {
   position: sticky;
   top: 0;
   display: flex;
   flex-direction: column;
   height: 100vh;
-  padding: 14px 0 10px;
   background: var(--rail-bg);
   border-right: 1px solid var(--rail-border);
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
   overflow: hidden;
+}
+
+.rail__brand {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: var(--shell-topbar-h);
+  padding: 0 var(--rail-inset);
+}
+
+.rail__brand .brand {
+  font-size: 0.96rem;
+}
+
+.rail__brand .brand img {
+  width: 24px;
+  height: 24px;
 }
 
 .rail__head {
@@ -807,15 +834,15 @@ img {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 26px;
-  padding: 0 12px 10px;
+  flex-shrink: 0;
+  padding: 2px var(--rail-inset) 8px;
 }
 
 .rail__title {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 800;
-  letter-spacing: 0.12em;
-  color: var(--rail-text-dim);
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
 }
 
 .rail__toggle {
@@ -828,7 +855,7 @@ img {
   border: 0;
   border-radius: 7px;
   background: transparent;
-  color: var(--rail-text-dim);
+  color: var(--text-dim);
   font: inherit;
   font-size: 0.9rem;
   line-height: 1;
@@ -838,7 +865,7 @@ img {
 
 .rail__toggle:hover {
   background: var(--rail-hover);
-  color: var(--rail-text-active);
+  color: var(--text-main);
 }
 
 .rail__list {
@@ -847,16 +874,17 @@ img {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: 0 8px 8px;
+  padding: 0 8px 10px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
 }
 
 .rail__list::-webkit-scrollbar { width: 6px; }
+
 .rail__list::-webkit-scrollbar-thumb {
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--rail-scroll-thumb);
 }
 
 .rail__item {
@@ -869,7 +897,7 @@ img {
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: var(--rail-text);
+  color: var(--text-sub);
   font: inherit;
   font-size: 0.86rem;
   font-weight: 600;
@@ -880,13 +908,13 @@ img {
 
 .rail__item:hover {
   background: var(--rail-hover);
-  color: var(--rail-text-active);
+  color: var(--text-main);
 }
 
-/* A soft tint, deliberately not a loud accent block. */
+/* A soft translucent tint — no border, no heavy accent block. */
 .rail__item.is-active {
   background: var(--rail-active);
-  color: var(--rail-text-active);
+  color: var(--text-main);
 }
 
 .rail__icon {
@@ -912,19 +940,58 @@ img {
   font-size: 0.7rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: var(--rail-text-dim);
+  color: var(--text-dim);
 }
 
 /* Collapsed: icons only, centred in a narrow strip. */
+.rail--collapsed .rail__brand {
+  justify-content: center;
+  padding: 0;
+}
+
+.rail--collapsed .rail__brand .brand__title {
+  display: none;
+}
+
 .rail--collapsed .rail__head {
   justify-content: center;
-  padding: 0 0 10px;
+  padding: 2px 0 8px;
 }
 
 .rail--collapsed .rail__item {
   grid-template-columns: 1fr;
   justify-items: center;
   padding: 8px 0;
+}
+
+/* --- main column --------------------------------------------------------- */
+
+.shell__main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.shell__topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  height: var(--shell-topbar-h);
+  padding: 0 var(--shell-gutter);
+}
+
+/* The brand lives in the rail on desktop; the top bar carries it on phones. */
+.shell__brand {
+  display: none;
+}
+
+.shell__topbar .header-actions {
+  margin-left: auto;
+}
+
+.shell__content {
+  padding: 2px var(--shell-gutter) 72px;
 }
 
 /* The chip bar is the narrow-screen replacement for the rail. */
@@ -1283,8 +1350,12 @@ img {
 
 @media (max-width: 1080px) {
   /* Narrow desktop / tablet: the rail becomes an icon-only strip. */
-  .rail-layout { grid-template-columns: var(--rail-width-collapsed) minmax(0, 1fr); }
-  .rail__head { justify-content: center; padding: 0 0 10px; }
+  .shell,
+  .shell.is-collapsed { grid-template-columns: var(--rail-width-collapsed) minmax(0, 1fr); }
+
+  .rail__brand { justify-content: center; padding: 0; }
+  .rail__brand .brand__title { display: none; }
+  .rail__head { justify-content: center; padding: 2px 0 8px; }
   .rail__item { grid-template-columns: 1fr; justify-items: center; padding: 8px 0; }
   .rail__title,
   .rail__label,
@@ -1315,13 +1386,16 @@ img {
 
   .page { padding-bottom: 48px; }
 
-  /* Phone: no rail; a sticky chip bar handles category jumping. */
-  .rail-layout,
-  .rail-layout.is-collapsed { grid-template-columns: minmax(0, 1fr); }
+  /* Phone: the rail is hidden and the top bar carries the brand again. */
+  .shell,
+  .shell.is-collapsed,
+  .shell--norail { grid-template-columns: minmax(0, 1fr); }
 
   .rail { display: none; }
 
-  .rail-main__inner { padding-top: 4px; }
+  .shell__brand { display: flex; }
+
+  .shell__content { padding-top: 0; }
 
   .chipbar {
     display: flex;

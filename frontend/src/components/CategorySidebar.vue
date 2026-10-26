@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
+import BrandMark from './BrandMark.vue'
 import type { Category } from '@/types/api'
 
 /**
  * Category rail for the scroll layout.
  *
- * It is a real column of the page shell: it sits on the page's left edge,
- * spans from below the header to the bottom of the viewport, and only ever
- * mirrors `site.categories` — the layout owns the scrolling behaviour.
+ * It is a column of the page shell: it starts at the very top of the site
+ * (holding the brand), runs to the bottom of the viewport and scrolls on its
+ * own. It only mirrors `site.categories` — the layout owns the scrolling.
  */
 const props = defineProps<{
   categories: Category[]
@@ -40,6 +41,10 @@ function count(category: Category): number {
 
 <template>
   <aside class="rail" :class="{ 'rail--collapsed': collapsed }" aria-label="分类导航">
+    <div class="rail__brand">
+      <BrandMark />
+    </div>
+
     <div class="rail__head">
       <span v-if="!collapsed" class="rail__title">分类</span>
       <button

@@ -14,13 +14,14 @@ import { useSiteStore } from '@/stores/site'
  * the selected layout. Both layouts read the same store and the same API, so
  * switching never duplicates or diverges the data, and the theme is untouched.
  *
- * The scroll layout uses a full-bleed shell (`page--rail`) so its category rail
- * can sit on the real page edge; the tabs layout keeps the centred container.
+ * The tabs layout keeps the centred page container and the classic header; the
+ * scroll layout renders its own full-page application shell (rail + main area).
  */
 const site = useSiteStore()
 const { current } = useLayout()
 
 const isTabs = computed(() => current.value === 'tabs')
+const showHeader = computed(() => isTabs.value || site.loading || Boolean(site.error))
 
 onMounted(() => {
   void site.load()
@@ -29,7 +30,7 @@ onMounted(() => {
 
 <template>
   <div class="page" :class="isTabs ? 'page--tabs' : 'page--rail'">
-    <AppHeader show-layout-switcher />
+    <AppHeader v-if="showHeader" show-layout-switcher />
 
     <div v-if="site.loading" class="empty">
       <span class="spinner" style="margin: 0 auto 10px" />

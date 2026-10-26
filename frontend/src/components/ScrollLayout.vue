@@ -1,20 +1,24 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import BookmarkGrid from './BookmarkGrid.vue'
+import BrandMark from './BrandMark.vue'
 import CategorySection from './CategorySection.vue'
 import CategorySidebar from './CategorySidebar.vue'
+import HeaderActions from './HeaderActions.vue'
 import SearchBar from './SearchBar.vue'
 import { useNavSearch } from '@/composables/useNavSearch'
 import { useSiteStore } from '@/stores/site'
 import { clampScrollTop, isAtBottom, pickActiveIndex } from '@/utils/scrollSpy'
 
 /**
- * Scroll layout.
+ * Scroll layout: one application shell.
  *
- * The page is a two-column shell: a category rail pinned to the page's left
- * edge (full height below the header, independently scrollable) and a content
- * column that holds the clock, search and every category. Both read the same
- * `site.categories`, so there is only ever one data source.
+ * The shell is a single two-column grid that spans the whole page. The left
+ * column is the category rail (brand on top, categories below, scrolling on its
+ * own); the right column is the main area with a top action bar and the content
+ * (clock, search, categories). Both columns share one horizontal rhythm, and
+ * the content column fills its space instead of being re-centred inside it, so
+ * the rail and the content never drift apart on wide screens.
  *
  * Clicking a category smooth-scrolls to it; scrolling updates the highlight.
  */
@@ -44,6 +48,9 @@ const clock = computed(() => {
 const dateLabel = computed(() =>
   now.value.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }),
 )
+
+const defaultNewTab = computed(() => site.settings?.open_in_new_tab_default ?? true)
+const hasCategories = computed(() => site.categories.length > 0)
 
 function sections(): HTMLElement[] {
   return Array.from(document.querySelectorAll<HTMLElement>('.category[data-category-id]'))
@@ -124,9 +131,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="rail-layout" :class="{ 'is-collapsed': sidebarCollapsed }">
+  <div
+    class="shell"
+    :class="{ 'is-collapsed': sidebarCollapsed, 'shell--norail': !hasCategories }"
+  >
     <CategorySidebar
-      v-if="site.categories.length"
+      v-if="hasCategories"
       :categories="site.categories"
       :active-id="activeId"
       :collapsed="sidebarCollapsed"
@@ -134,8 +144,15 @@ onUnmounted(() => {
       @toggle="toggleSidebar"
     />
 
-    <div class="rail-main">
-      <div class="rail-main__inner">
+    <div class="shell__main">
+      <div class="shell__topbar">
+        <!-- The brand lives in the rail on desktop; on phones the rail is hidden
+             and the top bar carries it instead. -->
+        <BrandMark class="shell__brand" />
+        <HeaderActions show-layout-switcher />
+      </div>
+
+      <div class="shell__content">
         <section class="clock">
           <div class="clock__time">{{ clock }}</div>
           <div class="clock__date">{{ dateLabel }}</div>
@@ -144,7 +161,7 @@ onUnmounted(() => {
         <SearchBar v-model="query" :engines="engines" :default-engine="defaultEngine" @submit="openEngine" />
 
         <!-- Narrow screens: a sticky chip bar replaces the rail. -->
-        <nav v-if="site.categories.length" class="chipbar" aria-label="分类快速跳转">
+        <nav v-if="hasCategories" class="chipbar" aria-label="分类快速跳转">
           <button
             v-for="category in site.categories"
             :key="category.id"
@@ -165,21 +182,17 @@ onUnmounted(() => {
               <span class="badge">{{ results.length }}</span>
               <span v-if="searching" class="spinner" />
             </div>
-            <BookmarkGrid
-              v-if="results.length"
-              :bookmarks="results"
-              :default-new-tab="site.settings?.open_in_new_tab_default ?? true"
-            />
+            <BookmarkGrid v-if="results.length" :bookmarks="results" :default-new-tab="defaultNewTab" />
             <p v-else-if="!searching" class="dim" style="font-size: 0.86rem">没有匹配的站点</p>
           </section>
         </template>
 
-        <template v-else-if="site.categories.length">
+        <template v-else-if="hasCategories">
           <CategorySection
             v-for="category in site.categories"
             :key="category.id"
             :category="category"
-            :default-new-tab="site.settings?.open_in_new_tab_default ?? true"
+            :default-new-tab="defaultNewTab"
           />
         </template>
 
