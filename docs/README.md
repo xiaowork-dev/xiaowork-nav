@@ -1,6 +1,6 @@
 # XiaoWork Nav V2.0 文档索引
 
-> 最后更新：2026-10-25
+> 最后更新：2026-10-26
 > 上位依据：[`../XiaoWork_Nav_V2_重构方案与实施计划.md`](../XiaoWork_Nav_V2_重构方案与实施计划.md)
 
 ## 规划与架构
@@ -68,6 +68,7 @@
 | [deliveries/P5-delivery.md](deliveries/P5-delivery.md) | **P5 阶段交付报告（正式归档，含 §12 v2.0.1 补充）** |
 | [deliveries/v2.1.0/](deliveries/v2.1.0/) | **V2.1.0 阶段交付报告（P1 架构 / P2 图标 / P3 滚动布局 / P4 标签布局 / P5 发布）** |
 | [deliveries/v2.1.1/sidebar-layout-fix.md](deliveries/v2.1.1/sidebar-layout-fix.md) | **V2.1.1 增量交付记录：滚动模式左侧分类栏布局优化** |
-| [deliveries/20261026-121645-scroll-shell-rework.md](deliveries/20261026-121645-scroll-shell-rework.md) | **滚动模式页面骨架重构（增量记录，待视觉验收）** |
+| [deliveries/20261026-121645-scroll-shell-rework.md](deliveries/20261026-121645-scroll-shell-rework.md) | **滚动模式页面骨架重构（增量记录）** |
+| [deliveries/v2.1.2/release.md](deliveries/v2.1.2/release.md) | **V2.1.2 版本发布交付文档** |
 | [deliveries/20261025-170154-p5-update-rollback-fix.md](deliveries/20261025-170154-p5-update-rollback-fix.md) | **P5 补充交付记录：一键更新与回滚修复（v2.0.1）** |
 | [deliveries/](deliveries/) | 过程记录与后续阶段交付报告 |
