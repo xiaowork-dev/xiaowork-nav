@@ -121,7 +121,8 @@ V2.1.1 把侧栏移到了页面左边缘，但生产使用后反馈四类问题�
 
 ### 4.3 部署异常注入（真实 Docker）
 
-结果见 §7.4（发布核验）。
+`scripts/tests/deploy-faults.test.sh`：**14 个场景 / 57 个断言全部通过，0 失败（退出码 0）**。
+场景清单与结果见 §7.4（该套件覆盖用户升级到 v2.1.2 时使用的完整路径）。
 
 ### 4.4 未执行的测试
 
@@ -157,17 +158,70 @@ V2.1.1 把侧栏移到了页面左边缘，但生产使用后反馈四类问题�
 
 ## 7. 发布结果
 
-> 本节在 CI/Release/GHCR 核验完成后填写（见下文）。
-
 ### 7.1 GitHub Actions
+
+| 工作流 | 结果 |
+| --- | --- |
+| CI（`main`，提交 `903519d`） | ✅ 成功（[run 40272127455](https://github.com/xiaowork-dev/xiaowork-nav/actions/runs/40272127455)） |
+| CI（标签 `v2.1.2`） | ✅ 成功 |
+| Release 流水线 | ✅ 成功（[run 40272624224](https://github.com/xiaowork-dev/xiaowork-nav/actions/runs/40272624224)） |
 
 ### 7.2 容器镜像
 
+| 项 | 值 |
+| --- | --- |
+| 镜像地址 | `ghcr.io/xiaowork-dev/xiaowork-nav:v2.1.2` |
+| 同步标签 | `v2.1.2` / `v2.1` / `latest`（同一摘要） |
+| 摘要 | `sha256:91985c0b2b4d72b20ae7a88dfb66e43686eeddcb150fce4e5eb84dfb16207f58` |
+| 架构 | ✅ `linux/amd64` + `linux/arm64` |
+| 匿名拉取 | ✅ `docker pull ghcr.io/xiaowork-dev/xiaowork-nav:v2.1.2` 成功（无需登录） |
+| 启动与健康检查 | ✅ 容器 `healthy`，非 root（`uid=100(app)`） |
+| `/healthz` | ✅ `{"status":"ok","version":"v2.1.2"}` |
+| `/api/v1/version` | ✅ `version=v2.1.2`、`commit=903519d`、**`schema_version=3`** |
+| `--db-info` | ✅ 返回 `exists=true`、`schema_version=3` |
+| 产物含本次布局 | ✅ 已发布镜像的静态资源包含 `page--rail`、`shell__topbar`、`shell__content`、`rail__brand`、`brand__mark`，且**不再包含**旧的 `rail-main__inner` |
+| 历史镜像未变 | ✅ `v2.1.1` = `sha256:2cc28538…`、`v2.1.0` = `sha256:7a87f947…`、`v2.0.1` = `sha256:4083919b…`、`v2.0.0` = `sha256:c8e2151f…` |
+
 ### 7.3 Release
 
-### 7.4 部署异常注入结果
+| 项 | 值 |
+| --- | --- |
+| 地址 | https://github.com/xiaowork-dev/xiaowork-nav/releases/tag/v2.1.2 |
+| 名称 | XiaoWork Nav v2.1.2 |
+| 状态 | 非 draft、非 prerelease |
+| 发布时间（UTC） | 2026-10-26T05:08:11Z |
+
+### 7.4 部署异常注入结果（真实 Docker）
+
+`scripts/tests/deploy-faults.test.sh`：**14 个场景 / 57 个断言全部通过，0 失败（退出码 0）**。
+
+| # | 场景 | 结果 |
+| --- | --- | --- |
+| 1 | 应用运行时读取数据库文件 | ✅ |
+| 2 | 固定版本已部署 → 幂等 | ✅ |
+| 3 | `latest` 镜像未变化 → 不重建容器 | ✅ |
+| 4 | 目标镜像不可用 → 不改动现场 | ✅ |
+| 5 | 镜像拉取失败（本地无副本） | ✅ |
+| 6 | 容器启动失败 → 回滚并验证 | ✅ |
+| 7 | 迁移后健康检查失败 → 先恢复快照再回滚 | ✅ |
+| 8 | 新镜像无法报告结构版本 → 保守回滚 | ✅ |
+| 9 | 应用停止时读取结构版本 | ✅ |
+| 10 | `restore.sh` 启动前切换版本 | ✅ |
+| 11 | 快照版本未知 → 拒绝启动 | ✅ |
+| 12 | NPM 模式（无宿主机端口）升级失败 → 回滚 | ✅ |
+| 13 | 从发布的 v2.0.1 升级：结构 2→3、数据与手动图标保留 | ✅ |
+| 14 | 只读数据目录 → 快速失败并给出修复指引 | ✅ |
+
+> 该套件覆盖的正是用户升级到 v2.1.2 时使用的路径（快照 → 切换 → 健康检查 → 失败回滚）。
 
 ### 7.5 发布提交
+
+| 项 | 值 |
+| --- | --- |
+| 功能提交 | `8031fd8` — `refactor(ui): rebuild the scroll layout as one application shell` |
+| 发布文档提交 | `903519d` — `docs(v2.1.2): prepare the release notes and delivery report`（标签 `v2.1.2` 指向此提交） |
+| 标签 | `v2.1.2`（附注标签，指向 `903519d`） |
+| 本文件的后续更新提交 | 见 `git log`（不硬写自身 SHA） |
 
 ## 8. 遗留问题与风险
 
