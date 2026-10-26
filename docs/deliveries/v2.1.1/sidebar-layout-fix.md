@@ -184,8 +184,23 @@ V2.1.0 发布后在生产环境实际使用中发现：滚动模式的左侧分�
 | 本次起点 | `199eb96`（`docs(v2.1): record the v2.1.0 release and verification`） |
 | 本次提交 | 见聊天总结与 `git log`（本文件不硬写自身提交 SHA） |
 | 推送 | ✅ 已推送 `origin/main` |
-| 发布标签 | `v2.1.1`（附注标签） |
-| 历史标签 | `v2.0.0` / `v2.0.1` / `v2.1.0` 未移动、未重建 |
+| 发布标签 | ✅ `v2.1.1`（附注标签，指向本次修复提交） |
+| 历史标签 | ✅ `v2.0.0` / `v2.0.1` / `v2.1.0` **未移动、未重建** |
+
+### 9.1 发布验证（2026-10-26）
+
+| 检查 | 结果 |
+| --- | --- |
+| CI（`main`） | ✅ 成功（run 40207896486） |
+| CI（标签 `v2.1.1`） | ✅ 成功 |
+| Release 流水线 | ✅ 成功（[run 40208136943](https://github.com/xiaowork-dev/xiaowork-nav/actions/runs/40208136943)） |
+| GitHub Release | ✅ `v2.1.1` 已创建（非 draft / 非 prerelease）：`https://github.com/xiaowork-dev/xiaowork-nav/releases/tag/v2.1.1` |
+| GHCR 镜像 | ✅ `ghcr.io/xiaowork-dev/xiaowork-nav:v2.1.1`，`linux/amd64` + `linux/arm64`，摘要 `sha256:2cc28538…` |
+| 镜像标签 | ✅ `v2.1.1` / `v2.1` / `latest` 指向同一摘要 |
+| 匿名拉取 | ✅ `docker pull ghcr.io/xiaowork-dev/xiaowork-nav:v2.1.1` 成功（无需登录） |
+| 运行已发布镜像 | ✅ `/healthz` = `{"status":"ok","version":"v2.1.1"}`；`/api/v1/version` = `v2.1.1` / commit `c84aa52` / `schema_version=3`；容器非 root（`uid=100(app)`） |
+| 发布产物含新布局 | ✅ 已发布镜像的静态资源包内包含 `page--rail`、`rail-layout`、`rail-main__inner`、`rail__item` |
+| 历史镜像 | ✅ `v2.1.0` 仍为 `sha256:7a87f947…`、`v2.0.1` 仍为 `sha256:4083919b…`、`v2.0.0` 仍为 `sha256:c8e2151f…` |
 
 ## 10. 遗留问题
 
