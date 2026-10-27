@@ -1,0 +1,47 @@
+name: One-time release dispatcher v2.1.3
+
+on:
+  push:
+    branches:
+      - release/v2.1.3-dispatch
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  publish:
+    name: Create v2.1.3 tag and dispatch official Release
+    if: github.repository == 'xiaowork-dev/xiaowork-nav' && github.event.head_commit.message == 'chore(release): create and dispatch v2.1.3'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify version tag is new and target is on main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --tags
+          if git show-ref --verify --quiet refs/tags/v2.1.3; then
+            echo "::error::v2.1.3 already exists; refusing to overwrite it"
+            exit 1
+          fi
+          git cat-file -e 093a78aa320a88c73d872830acddf9531497e7b3^{commit}
+          git merge-base --is-ancestor 093a78aa320a88c73d872830acddf9531497e7b3 origin/main
+      - name: Create annotated version tag at tested merge commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a v2.1.3 093a78aa320a88c73d872830acddf9531497e7b3 -m "XiaoWork Nav v2.1.3 — optional ASCII Pond theme"
+          git push origin refs/tags/v2.1.3
+      - name: Trigger existing official Release workflow
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run release.yml --ref v2.1.3 -f tag=v2.1.3
+          echo "Version tag pushed; release.yml dispatched on v2.1.3."
