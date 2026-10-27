@@ -274,8 +274,8 @@ cd <repo> && git apply docs/deliveries/ascii-pond-ci-assert.patch \
 | 认证方式 | 环境已具备 `gh` 登录（账号 `xiaowork-dev`，token scopes: `gist, read:org, repo`），执行 `gh auth setup-git` 后走 HTTPS credential helper；凭据未写入仓库、未出现在日志 |
 | 远程冲突检查 | 推送前远程 HEAD 为 `c5d8bb5`（与本地基线一致），无冲突性修改，属快进推送 |
 | 强制推送 | 未使用 |
-| PR #1 | 🔄 **已更新**：head SHA 指向最新提交；描述已用 REST API 替换（1742 字符，含新增功能/修复/测试/验收/Docker/未验证项/发布建议）；未新建重复 PR |
-| PR 状态 | OPEN，`draft`（是否转「可审查」见 §11） |
+| PR #1 | ✅ **已更新**：head SHA 指向最新提交；描述已用 REST API 替换（1742 字符，含新增功能/修复/测试/验收/Docker/未验证项/发布建议）；未新建重复 PR |
+| PR 状态 | OPEN，**已转为 ready for review**（`gh pr ready 1`） |
 | CI | ✅ 四项全绿，含 Docker 镜像构建与容器冒烟（见 §7.5） |
 
 说明：`gh pr edit` 会因仓库启用了已弃用的 Projects (classic) 而只回一条 GraphQL 警告且不写库，故改用 `gh api --method PATCH repos/{owner}/{repo}/pulls/1 -F body=@file` 完成更新，并回读校验长度一致。
