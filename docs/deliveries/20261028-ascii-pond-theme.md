@@ -2,7 +2,7 @@
 
 - 日期：2026-10-28（第二轮收尾同日完成）
 - 分支：`feat/ascii-pond-theme`（PR #1）
-- 当前状态：**已推送至开发分支，PR #1 已转为可审查；前端/后端及 30 组浏览器验收通过，旧 CI 四项全绿。已在本分支提交池塘资源专项 Docker 冒烟断言，新一轮 CI 正在验证；仍需维护者人眼视觉终审。未合并、未正式发布、未部署生产。**
+- 当前状态：**已推送至开发分支，PR #1 已转为可审查；前端/后端及 30 组浏览器验收通过，CI #29 四项全绿，包含新增的池塘静态资源 HTTP 200/MIME 专项断言；仍需维护者人眼视觉终审。未合并、未正式发布、未部署生产。**
 - 上游参考：<https://github.com/stqfdyr/ascii-pond>（MIT，Copyright (c) 2026 stqfdyr）
 
 ---
@@ -221,8 +221,8 @@ PR 原有内容（vendor 四文件、`useTheme.ts`、`HomePage.vue`、`main.ts`�
 - 修改位置：`.github/workflows/ci.yml` 的 `Docker image builds → Smoke test the image`，提交 `d2c030d`（开发分支）。
 - 在启动测试容器后，检查 `/vendor/ascii-pond/pond.js`、`koi.js`、`util.js`、`LICENSE` 的 HTTP 200，并检查 `pond.js` 的响应 Content-Type 含 `javascript`。
 - 之前 Agent 环境因为 OAuth 缺少 `workflow` scope 而无法修改工作流；本次已通过可用的 GitHub 写入权限成功提交（读取远程文件复核完成），原权限阻塞**已解决**。
-- 触发的新一轮工作流：[`CI #29`](https://github.com/xiaowork-dev/xiaowork-nav/actions/runs/40590571783)，新断言的实际执行结论**待 GitHub Actions 完成后确认**。
-- 仓库还保留历史补丁 `docs/deliveries/ascii-pond-ci-assert.patch`，仅作为开发记录，不得在当前分支再次 `git apply`，避免重复插入断言。
+- 触发的工作流：[`CI #29`](https://github.com/xiaowork-dev/xiaowork-nav/actions/runs/40590571783)，GitHub Actions 返回 **completed / success**；本次构建与容器冒烟包含新断言，已验证通过。
+- 过时补丁 `docs/deliveries/ascii-pond-ci-assert.patch` 已从本分支删除，避免重复应用。
 
 ### 7.6 仍待补做
 
@@ -259,7 +259,7 @@ PR 原有内容（vendor 四文件、`useTheme.ts`、`HomePage.vue`、`main.ts`�
 | 强制推送 | 未使用 |
 | PR #1 | ✅ **已更新**：head SHA 指向最新提交；描述已用 REST API 替换（1742 字符，含新增功能/修复/测试/验收/Docker/未验证项/发布建议）；未新建重复 PR |
 | PR 状态 | OPEN，**已转为 ready for review**（`gh pr ready 1`） |
-| CI | 原有 CI 已全绿（见 §7.5），新增资源专项 CI #29 正在执行（见 §7.7）；其结果以 GitHub Actions 实时记录为准 |
+| CI | 原有 CI 已全绿；新增资源专项 [CI #29](https://github.com/xiaowork-dev/xiaowork-nav/actions/runs/40590571783) 已成功（见 §7.7） |
 
 说明：`gh pr edit` 会因仓库启用了已弃用的 Projects (classic) 而只回一条 GraphQL 警告且不写库，故改用 `gh api --method PATCH repos/{owner}/{repo}/pulls/1 -F body=@file` 完成更新，并回读校验长度一致。
 
@@ -267,7 +267,7 @@ PR 原有内容（vendor 四文件、`useTheme.ts`、`HomePage.vue`、`main.ts`�
 
 ## 10. 已知问题与未验证事项
 
-1. GitHub 推送与 PR 描述更新已完成；专项 CI 工作流也已成功提交，等待新断言运行结果，见 §7.7、§9。
+1. GitHub 推送与 PR 描述更新已完成；专项 CI 工作流也已提交并经 CI #29 实际验证成功，见 §7.7、§9。
 2. **本地** Docker daemon 权限不足，但 GitHub Actions 已真实构建 Docker 镜像并完成既有容器冒烟；带数据的完整容器测试尚未执行，见 §7。
 3. 真实 GPU / 真机帧率未验证；验收环境为软件渲染。
 4. **未做人眼目视复核**（当前模型无图像输入能力），以像素量化替代，见 §6.7。
@@ -291,20 +291,20 @@ PR 原有内容（vendor 四文件、`useTheme.ts`、`HomePage.vue`、`main.ts`�
 | 性能无明显问题、滚动不受影响 | ✅ |
 | 分支已推送、PR 已更新 | ✅ PR #1，可审查；专项断言另见提交 `d2c030d` |
 | Docker 镜像构建与容器冒烟 | ✅ CI run `40589236773`（Docker job pass，1m21s） |
-| CI 全绿 | ✅ 先前四项已通过；新增静态资源专项断言等待 CI #29 完成 |
+| CI 全绿 | ✅ [CI #29](https://github.com/xiaowork-dev/xiaowork-nav/actions/runs/40590571783) completed / success（新增静态资源断言已纳入） |
 | 人眼视觉终审 | ⚠️ **未完成**，属维护者动作（截图已就绪） |
 
-**结论**：现有代码与基础验证达到预期，专项 CI 变更已提交，需待本轮 CI #29 确认通过；人眼视觉终审仍未完成。PR 已标记「可供审查」，合并与发布必须另经维护者批准。
+**结论**：代码、浏览器自动化与专项 Docker CI 均达到预期；人眼视觉终审仍未完成。PR 已标记「可供审查」，合并与发布必须另经维护者批准。
 
 ## 12. PR #1 描述维护
 
-PR #1 已成功更新描述并转为「可供审查」，不再需要人工粘贴旧模板。原描述曾提前宣称专项 CI 断言已上线，但当时实际是待授权补丁；该不一致已通过本次提交 `d2c030d` 补齐，仍须等待本次新 CI 的真实结果。以 [PR #1](https://github.com/xiaowork-dev/xiaowork-nav/pull/1) 的在线描述和 GitHub Actions 实时状态为准。
+PR #1 已成功更新描述并转为「可供审查」，不再需要人工粘贴旧模板。原描述曾提前宣称专项 CI 断言已上线，当时实际是待授权补丁；该不一致已由提交 `d2c030d` 补齐，并由 [CI #29](https://github.com/xiaowork-dev/xiaowork-nav/actions/runs/40590571783) 完成验证。以 [PR #1](https://github.com/xiaowork-dev/xiaowork-nav/pull/1) 的在线描述与 Actions 状态为准。
 
 ---
 
 ## 13. 下一步
 
-1. 等待 [CI #29](https://github.com/xiaowork-dev/xiaowork-nav/actions/runs/40590571783) 的新增静态资源断言执行完成并核实结果。
+1. ✅ 已核实 [CI #29](https://github.com/xiaowork-dev/xiaowork-nav/actions/runs/40590571783) 执行成功，新增静态资源断言有效。
 2. 维护者目视确认 `docs/screenshots/ascii-pond/final-*` 六张真实截图（截图为 Agent 工作环境的本地文件，未跟踪入 Git）。
 3. 如方便，在独立 Docker 环境补做带数据的容器冒烟和真实设备帧率复核；不要使用生产数据卷。
 4. 确认通过后，由维护者授权合并 PR、打版本标签及正式发布；本阶段不操作生产。
