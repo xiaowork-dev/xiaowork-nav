@@ -33,15 +33,13 @@
 :root[data-theme='pond'] .search__box,
 :root[data-theme='pond'] .panel { box-shadow: var(--shadow-soft); }
 :root[data-theme='pond'] .tile__label { text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+/* Tile fallbacks are drawn on the warm paper tile, not on the pond: the accent
+   orange is far too light there (1.6:1), so they get a deep umber instead. */
+:root[data-theme='pond'] .tile__letter,
+:root[data-theme='pond'] .tile__text,
+:root[data-theme='pond'] .tile__fallback { color: #7a4a24; }
 :root[data-theme='pond'] .select option,
-:root[data-theme='pond'] .search__engine option { color: #fff7f0; background: #282723; }
+:root[data-theme='pond'] .search__engine option,
+:root[data-theme='pond'] .theme-picker__select option { color: #fff7f0; background: #282723; }
 :root[data-theme='pond'] #app { position: relative; z-index: 1; }
 :root[data-theme='pond'] canvas.ascii-pond-canvas { z-index: 0; }
-.theme-picker { display: inline-flex; flex-shrink: 0; }
-.theme-picker__select {
-  color: var(--text-main); background: var(--surface-strong);
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
-  min-height: 32px; padding: 0 8px; cursor: pointer;
-  font: inherit; font-size: .8rem;
-}
-.theme-picker__select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
