@@ -1,0 +1,18 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index dc37fb3..7dc6086 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -93,6 +93,13 @@ jobs:
+           done
+           curl -fsS http://127.0.0.1:18080/healthz
+           curl -fsS http://127.0.0.1:18080/api/v1/version
++          # The optional pond theme loads its engine from the image at runtime,
++          # so the vendored module has to be served (and served as JavaScript).
++          for asset in pond.js koi.js util.js LICENSE; do
++            code=$(curl -fsS -o /dev/null -w '%{http_code}' "http://127.0.0.1:18080/vendor/ascii-pond/$asset")
++            test "$code" = "200" || { echo "vendor asset $asset returned $code"; exit 1; }
++          done
++          curl -fsS -o /dev/null -w '%{content_type}\n' http://127.0.0.1:18080/vendor/ascii-pond/pond.js | grep -q 'javascript'
+           curl -fsS http://127.0.0.1:18080/ | grep -q '<div id="app">'
+           docker rm -f xn-ci
+ 
