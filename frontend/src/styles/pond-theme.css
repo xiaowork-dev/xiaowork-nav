@@ -1,0 +1,45 @@
+/* Opt-in ASCII Pond: change appearance only; no layout dimensions altered. */
+:root[data-theme='pond'] {
+  color-scheme: dark;
+  --bg-base: #1a1917;
+  --bg-1: #1a1917;
+  --bg-2: #1a1917;
+  --bg-3: #1a1917;
+  --bg-4: #1a1917;
+  --surface: rgba(34, 33, 32, 0.65);
+  --surface-strong: rgba(42, 41, 40, 0.86);
+  --surface-solid: #282723;
+  --border: rgba(255, 247, 240, 0.14);
+  --border-strong: rgba(255, 247, 240, 0.33);
+  --text-main: #fff7f0;
+  --text-sub: #d0c8c0;
+  --text-dim: #9b958e;
+  --accent: #e6a878;
+  --accent-2: #d98758;
+  --accent-contrast: #1a1917;
+  --input-bg: rgba(27, 26, 25, 0.90);
+  --tile-bg: #e9e3da;
+  --shadow-soft: 0 10px 28px rgba(0,0,0,0.22);
+  --shadow-card: 0 6px 18px rgba(0,0,0,0.22);
+  --rail-bg: rgba(26,25,23,0.83);
+  --rail-border: rgba(255,247,240,0.11);
+  --rail-hover: rgba(255,247,240,0.08);
+  --rail-active: rgba(230,168,120,0.15);
+  --rail-chip: rgba(255,247,240,0.08);
+  --rail-scroll-thumb: rgba(255,247,240,0.15);
+}
+:root[data-theme='pond'] body { background: #1a1917; }
+:root[data-theme='pond'] .page--tabs { background-image: none; }
+:root[data-theme='pond'] .search__box,
+:root[data-theme='pond'] .panel { box-shadow: var(--shadow-soft); }
+:root[data-theme='pond'] .tile__label { text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+/* Tile fallbacks are drawn on the warm paper tile, not on the pond: the accent
+   orange is far too light there (1.6:1), so they get a deep umber instead. */
+:root[data-theme='pond'] .tile__letter,
+:root[data-theme='pond'] .tile__text,
+:root[data-theme='pond'] .tile__fallback { color: #7a4a24; }
+:root[data-theme='pond'] .select option,
+:root[data-theme='pond'] .search__engine option,
+:root[data-theme='pond'] .theme-picker__select option { color: #fff7f0; background: #282723; }
+:root[data-theme='pond'] #app { position: relative; z-index: 1; }
+:root[data-theme='pond'] canvas.ascii-pond-canvas { z-index: 0; }
