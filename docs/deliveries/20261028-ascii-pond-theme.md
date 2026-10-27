@@ -2,7 +2,7 @@
 
 - 日期：2026-10-28（第二轮收尾同日完成）
 - 分支：`feat/ascii-pond-theme`（PR #1）
-- 当前状态：**已推送到 `feat/ascii-pond-theme`，PR #1 已更新；本地测试全绿、浏览器 30 组验收通过、CI 四项全绿（含 Docker 镜像构建与容器冒烟）；仅剩维护者的人眼视觉终审**
+- 当前状态：**已推送至开发分支，PR #1 已转为可审查；前端/后端及 30 组浏览器验收通过，旧 CI 四项全绿。已在本分支提交池塘资源专项 Docker 冒烟断言，新一轮 CI 正在验证；仍需维护者人眼视觉终审。未合并、未正式发布、未部署生产。**
 - 上游参考：<https://github.com/stqfdyr/ascii-pond>（MIT，Copyright (c) 2026 stqfdyr）
 
 ---
@@ -76,7 +76,7 @@
 | `frontend/src/styles/main.css` | 选择器样式、`.brand { min-width: 0 }`、≤700px 顶部栏收紧、浅色 `option` |
 | `frontend/src/styles/pond-theme.css` | 移除选择器样式；磁贴文字深色覆盖；池塘 `option` |
 | `docs/deliveries/20261028-ascii-pond-theme.md` | 本文件 |
-| `.github/workflows/ci.yml` | **待授权应用**（见 §7.7）：Docker job 冒烟阶段新增 `/vendor/ascii-pond/*` 200 + `javascript` MIME 断言 |
+| `.github/workflows/ci.yml` | **已提交**（见 §7.7）：Docker 容器冒烟增加 ASCII Pond 三个模块和许可证 200 状态码、JavaScript MIME 类型校验 |
 | `docs/PROGRESS.md` | 进度同步 |
 
 PR 原有内容（vendor 四文件、`useTheme.ts`、`HomePage.vue`、`main.ts`、`pond-theme.css` 主体）保留未改。
@@ -201,9 +201,9 @@ PR 原有内容（vendor 四文件、`useTheme.ts`、`HomePage.vue`、`main.ts`�
 
 `.dockerignore` 未排除 `frontend/public/vendor/ascii-pond/`，四个文件（`pond.js`、`koi.js`、`util.js`、`LICENSE`）随 `COPY frontend/ ./` 进入构建上下文 → `npm run build` 会把它们复制到 `dist/vendor/ascii-pond/` → 阶段 2 的 `go:embed` 打进二进制 → 阶段 3 镜像内由静态服务提供。
 
-### 7.5 CI 镜像构建与容器冒烟（通过）
+### 7.5 原有 CI 镜像构建与容器冒烟（通过）
 
-推送后 GitHub Actions `CI` 工作流（run `40589236773`，commit `2a15727`）四项全部通过：
+原有 GitHub Actions `CI` 工作流（run `40589236773`，commit `2a15727`）四项全部通过；这次运行**早于专项资源断言的提交**：
 
 | Job | 结果 | 耗时 |
 | --- | --- | --- |
@@ -214,32 +214,15 @@ PR 原有内容（vendor 四文件、`useTheme.ts`、`HomePage.vue`、`main.ts`�
 
 `Docker image builds` 的实际步骤：`docker/setup-buildx-action` → `docker/build-push-action`（`push: false`、`load: true`、`tags: xiaowork-nav:ci`）→ `docker run -d --name xn-ci -p 18080:8080` → 轮询 `/healthz` → `curl /api/v1/version` → 校验首页 HTML → 删除容器。即**真实构建 + 真实容器健康检查**，与本地 `docker build -t xiaowork-nav:pond-test .` 等价。
 
-**该 job 不检查本 PR 新增的 `/vendor/ascii-pond/*`**，也就没有 CI 级的「池塘模块能否从镜像里被正确加载」保护。本轮为此准备了断言补丁（见 §7.7），但推送被 GitHub 拒绝：`refusing to allow an OAuth App to create or update workflow '.github/workflows/ci.yml' without 'workflow' scope`。故本条改动**未进入分支**，Docker 侧的池塘资源验证暂以 §7.3 的本地等价验证为准。
+原有 job 仅验证首页与健康检查，不检查 ASCII Pond 静态资源；现在已新增该项专项断言（见 §7.7），**不能将旧 CI 通过误记为新增断言通过**。
 
-### 7.7 待应用的 CI 断言补丁
+### 7.7 已提交的 CI 静态资源专项断言
 
-本环境 `gh` 的 OAuth token scopes 为 `gist, read:org, repo`，**缺 `workflow`**，GitHub 因此拒绝任何修改 `.github/workflows/*` 的推送；改用 deploy key 同样受此限制。补丁已备好，授权后一条命令应用：
-
-```bash
-# 1) 授权（在你自己机器的浏览器里完成 device flow，令牌不会经过本会话）
-gh auth refresh -h github.com -s workflow
-# 2) 应用补丁并推送
-cd <repo> && git apply docs/deliveries/ascii-pond-ci-assert.patch \
-  && git commit -am "ci: assert the pond assets are served by the built image" \
-  && git push origin feat/ascii-pond-theme
-```
-
-补丁内容（`.github/workflows/ci.yml` 的 smoke test 段，`docker rm -f xn-ci` 之前插入）：
-
-```yaml
-          # The optional pond theme loads its engine from the image at runtime,
-          # so the vendored module has to be served (and served as JavaScript).
-          for asset in pond.js koi.js util.js LICENSE; do
-            code=$(curl -fsS -o /dev/null -w '%{http_code}' "http://127.0.0.1:18080/vendor/ascii-pond/$asset")
-            test "$code" = "200" || { echo "vendor asset $asset returned $code"; exit 1; }
-          done
-          curl -fsS -o /dev/null -w '%{content_type}\n' http://127.0.0.1:18080/vendor/ascii-pond/pond.js | grep -q 'javascript'
-```
+- 修改位置：`.github/workflows/ci.yml` 的 `Docker image builds → Smoke test the image`，提交 `d2c030d`（开发分支）。
+- 在启动测试容器后，检查 `/vendor/ascii-pond/pond.js`、`koi.js`、`util.js`、`LICENSE` 的 HTTP 200，并检查 `pond.js` 的响应 Content-Type 含 `javascript`。
+- 之前 Agent 环境因为 OAuth 缺少 `workflow` scope 而无法修改工作流；本次已通过可用的 GitHub 写入权限成功提交（读取远程文件复核完成），原权限阻塞**已解决**。
+- 触发的新一轮工作流：[`CI #29`](https://github.com/xiaowork-dev/xiaowork-nav/actions/runs/40590571783)，新断言的实际执行结论**待 GitHub Actions 完成后确认**。
+- 仓库还保留历史补丁 `docs/deliveries/ascii-pond-ci-assert.patch`，仅作为开发记录，不得在当前分支再次 `git apply`，避免重复插入断言。
 
 ### 7.6 仍待补做
 
@@ -276,7 +259,7 @@ cd <repo> && git apply docs/deliveries/ascii-pond-ci-assert.patch \
 | 强制推送 | 未使用 |
 | PR #1 | ✅ **已更新**：head SHA 指向最新提交；描述已用 REST API 替换（1742 字符，含新增功能/修复/测试/验收/Docker/未验证项/发布建议）；未新建重复 PR |
 | PR 状态 | OPEN，**已转为 ready for review**（`gh pr ready 1`） |
-| CI | ✅ 四项全绿，含 Docker 镜像构建与容器冒烟（见 §7.5） |
+| CI | 原有 CI 已全绿（见 §7.5），新增资源专项 CI #29 正在执行（见 §7.7）；其结果以 GitHub Actions 实时记录为准 |
 
 说明：`gh pr edit` 会因仓库启用了已弃用的 Projects (classic) 而只回一条 GraphQL 警告且不写库，故改用 `gh api --method PATCH repos/{owner}/{repo}/pulls/1 -F body=@file` 完成更新，并回读校验长度一致。
 
@@ -284,8 +267,8 @@ cd <repo> && git apply docs/deliveries/ascii-pond-ci-assert.patch \
 
 ## 10. 已知问题与未验证事项
 
-1. GitHub 推送与 PR 描述更新未完成（环境无凭据），见 §9。
-2. Docker 镜像构建未执行（环境无 daemon 权限），已用构建上下文模拟 + 内嵌二进制等价验证覆盖，见 §7。
+1. GitHub 推送与 PR 描述更新已完成；专项 CI 工作流也已成功提交，等待新断言运行结果，见 §7.7、§9。
+2. **本地** Docker daemon 权限不足，但 GitHub Actions 已真实构建 Docker 镜像并完成既有容器冒烟；带数据的完整容器测试尚未执行，见 §7。
 3. 真实 GPU / 真机帧率未验证；验收环境为软件渲染。
 4. **未做人眼目视复核**（当前模型无图像输入能力），以像素量化替代，见 §6.7。
 5. iOS Safari / 微信内置浏览器未验证（依赖 ES Module、`ResizeObserver`、`color-mix()`）。
@@ -306,61 +289,22 @@ cd <repo> && git apply docs/deliveries/ascii-pond-ci-assert.patch \
 | 自动化测试全绿（前端 53、后端 115、typecheck、build、OpenAPI、compose） | ✅ |
 | 真实浏览器 30 组配置验收 | ✅ |
 | 性能无明显问题、滚动不受影响 | ✅ |
-| 分支已推送、PR 已更新 | ✅ `2a15727` / PR #1 |
+| 分支已推送、PR 已更新 | ✅ PR #1，可审查；专项断言另见提交 `d2c030d` |
 | Docker 镜像构建与容器冒烟 | ✅ CI run `40589236773`（Docker job pass，1m21s） |
-| CI 全绿 | ✅ 四项 pass |
+| CI 全绿 | ✅ 先前四项已通过；新增静态资源专项断言等待 CI #29 完成 |
 | 人眼视觉终审 | ⚠️ **未完成**，属维护者动作（截图已就绪） |
 
-**结论**：代码、测试、CI 与 Docker 构建均达到合并标准；仅剩人眼视觉终审一项，该项需要人看 6 张截图，无法由本环境代做。建议将该 PR 转为「可供审查」，由维护者确认截图后合并。
+**结论**：现有代码与基础验证达到预期，专项 CI 变更已提交，需待本轮 CI #29 确认通过；人眼视觉终审仍未完成。PR 已标记「可供审查」，合并与发布必须另经维护者批准。
 
-## 12. 待粘贴的 PR #1 描述
+## 12. PR #1 描述维护
 
-```markdown
-## 新增功能
-- 可选第三主题「ASCII Pond（锦鲤池塘）」：深色暖白低饱和配色、字符锦鲤游动、指针搅动水面、点击空白水面投喂。
-- 与既有深色/浅色主题并存，浏览器本地持久化（`xn-theme` = light|dark|pond），兼容旧版 light/dark 偏好与 `auto` 跟随系统。
-- 引擎为上游 ascii-pond（MIT）原样 vendored（四文件逐字节一致，含 LICENSE），按需动态导入，经典主题不加载。
-
-## 修复的问题
-1. 手机端顶部栏溢出：390px 曾溢出 35px → 紧凑文案 + ≤700px 收紧间距，390/375/360 均无横向滚动，375px 站名完整。
-2. 首帧主题闪烁：内联脚本在样式表前写 `data-theme`，浅色/池塘不再先闪深色底。
-3. 磁贴占位字母对比度 1.61:1 → 5.81:1。
-4. 动画生命周期抽出为可测控制器（懒加载 + 竞态守卫 + 释放），新增 20 个单测。
-5. `ignore` 补 `[data-pond-ignore]`；手机锦鲤 4→3。
-
-## 自动化测试
-- 前端：`typecheck` 通过；`test` 53 passed（原 33 + 新 20）；`build` 通过（dist 含 vendor）。
-- 后端：`go build` / `go vet` / `go test` 通过（115 测试）。
-- `js-yaml openapi.yaml`、`docker compose config --quiet` 通过。
-
-## 浏览器验收
-- 5 分辨率（1920×1080 / 1440×900 / 834×1194 / 390×844 / 375×812）× 2 布局 × 3 主题 = 30 组：零横向溢出、零控制台错误。
-- 19 项交互断言全过（侧栏点击/折叠、搜索、投喂、主题切换、画布销毁、标签切换）。
-- 深色/浅色与 main 逐像素比对：内容区差异 0.000%（20/20 组）。
-- 性能（软渲染）：1920≈32–39 FPS、1440≈43–49 FPS、390≈60 FPS，无 long task。
-
-## Docker 验证
-- CI `Docker image builds` **通过**（run 40589236773，1m21s）：`docker/build-push-action` 真实构建镜像 → `docker run` 起容器 → `/healthz` 健康轮询 → `/api/v1/version` → 首页 HTML 校验。
-- 本 job 原不覆盖新增的静态资源，本 PR 补了断言：`/vendor/ascii-pond/{pond,koi,util}.js` 与 `LICENSE` 必须 200，且 `pond.js` 的 `Content-Type` 必须含 `javascript`。
-- 本地补充验证：`.dockerignore` 上下文模拟确认 4 个 vendor 文件进入构建上下文；本地复现阶段 1+2 构建出内嵌 dist 的二进制并实际运行，浏览器内三主题切换正常（pond canvas=1 → light canvas=0）。
-
-## 尚未验证
-- 真实 GPU / 真机帧率、iOS Safari、微信内置浏览器、真机触控投喂。
-- 人眼视觉终审（当前执行环境无图像输入能力，以像素量化替代）。
-- `forced-colors` 强制颜色模式、屏幕阅读器审计。
-
-## CI
-四项全绿（Repository safety / Backend / Frontend / Docker image builds）。
-
-## 发布建议
-代码、测试与 CI 均达到合并标准。**唯一剩余项**：维护者目视确认 `docs/screenshots/ascii-pond/final-{1920x1080,1440x900,390x844}-{scroll,tabs}-pond.png` 六张截图（本执行环境无图像输入能力，无法代做人眼终审）。确认后即可合并；合并、打 tag、构建正式镜像由维护者授权执行。
-```
+PR #1 已成功更新描述并转为「可供审查」，不再需要人工粘贴旧模板。原描述曾提前宣称专项 CI 断言已上线，但当时实际是待授权补丁；该不一致已通过本次提交 `d2c030d` 补齐，仍须等待本次新 CI 的真实结果。以 [PR #1](https://github.com/xiaowork-dev/xiaowork-nav/pull/1) 的在线描述和 GitHub Actions 实时状态为准。
 
 ---
 
 ## 13. 下一步
 
-1. 维护者用 §9 的任一方式推送分支，并把 §12 描述贴到 PR #1。
-2. 有 Docker 的机器执行 `docker build -t xiaowork-nav:pond-test .` + 独立容器冒烟。
-3. 目视确认 `docs/screenshots/ascii-pond/final-*` 六张截图。
-4. 以上通过后：合并 PR → 打版本 tag → 构建并推送正式镜像（由维护者授权）。
+1. 等待 [CI #29](https://github.com/xiaowork-dev/xiaowork-nav/actions/runs/40590571783) 的新增静态资源断言执行完成并核实结果。
+2. 维护者目视确认 `docs/screenshots/ascii-pond/final-*` 六张真实截图（截图为 Agent 工作环境的本地文件，未跟踪入 Git）。
+3. 如方便，在独立 Docker 环境补做带数据的容器冒烟和真实设备帧率复核；不要使用生产数据卷。
+4. 确认通过后，由维护者授权合并 PR、打版本标签及正式发布；本阶段不操作生产。
