@@ -1,6 +1,6 @@
 # 项目进度总览
 
-> 最后更新：2026-10-28 04:05（Asia/Shanghai）
+> 最后更新：2026-10-28 05:05（Asia/Shanghai）
 > 项目：XiaoWork Nav V2.0（版本 **2.1.2**；`feat/ascii-pond-theme` 分支在研）
 > 总体状态：**v2.1.2 已发布** —— 滚动模式页面骨架重构（纯前端，无数据库结构变更）；
 > 用户已完成视觉验收。**生产服务器仍为 v2.1.1，升级由用户自行执行。**
@@ -61,15 +61,15 @@
 | **v2.1.1 侧栏布局优化** | ✅ 已完成 | 侧栏改为贴左边缘、通高、独立滚动、无卡片感；212px 宽；28 个前端单元测试；真实数据浏览器实测（含优化前后截图） | [V2.1.1 增量记录](deliveries/v2.1.1/sidebar-layout-fix.md) |
 | **滚动模式页面骨架重构** | ✅ 已完成 | 整页单一 grid 外壳；修复主列二次居中造成的 54–254px 死空白；侧栏并入主题背景体系（浅色不再用深色块）；品牌入栏、顶栏 64px 对齐；33 个前端单元测试 | [增量记录](deliveries/20261026-121645-scroll-shell-rework.md) |
 | **v2.1.2 版本发布** | ✅ 已完成 | 用户视觉验收通过；完整回归（后端 115 / 前端 33）；标签 `v2.1.2` → CI/Release → GHCR 多架构 → 匿名拉取与健康检查 | [V2.1.2 发布文档](deliveries/v2.1.2/release.md) |
-| **ASCII Pond 可选主题（`feat/ascii-pond-theme`）** | 🟡 代码完成，测试与浏览器验收通过；未推送/未合并 | 前端 53 测试、`typecheck`/`build`、后端 115 测试全绿；30 组真实浏览器配置（5 分辨率 × 2 布局 × 3 主题）零溢出零报错；深色/浅色内容区与 main 逐像素一致（0.000%）；修复手机端顶部溢出、首帧闪烁、磁贴占位字母对比度（1.61→5.81） | [交付记录](deliveries/20261028-ascii-pond-theme.md) |
+| **ASCII Pond 可选主题（`feat/ascii-pond-theme`）** | 🟡 代码完成、测试与浏览器验收全绿；未推送、Docker 未构建 | 前端 53 / 后端 115 测试、typecheck、build、OpenAPI、compose 全绿；30 组浏览器配置零溢出零报错；深色·浅色内容区与 main 逐像素 0.000% 差异；磁贴区动画干扰 0.000%；性能 1920≈32–39 / 1440≈43–49 / 390≈60 FPS（软渲染） | [交付记录](deliveries/20261028-ascii-pond-theme.md) |
 
 ## 正在进行 / 未完成
 
 | 工作项 | 现状 | 下一动作 |
 | --- | --- | --- |
-| **推送 `feat/ascii-pond-theme` 并更新 PR #1** | 本地提交完成；当前环境无 GitHub 凭据（无 token / SSH key / gh） | 维护者执行 `git push origin feat/ascii-pond-theme`，并把交付记录的验收摘要贴到 PR #1 |
-| **池塘主题 Docker 镜像构建** | 未执行：无 `docker` socket 权限 | 在具备 Docker 的环境执行 `docker build -t xiaowork-nav:pond-test .` |
-| **池塘主题真实 GPU/真机帧率** | 未验证：验收环境为 SwiftShader 软渲染 | 在真实设备（含 1920 集显与 iPhone）复核帧率与观感 |
+| **推送 `feat/ascii-pond-theme` 并更新 PR #1** | 本地提交完成、工作区干净；环境无 SSH agent / 凭据助手 / gh CLI，`git push` 报 `could not read Username` | 按交付记录 §9 的任一种方式授权后推送，并把 §12 的文本贴到 PR #1 |
+| **池塘主题 Docker 镜像构建** | 未执行：`/var/run/docker.sock` 属 `root:docker`，用户不在 docker 组且 sudo 被禁；已尝试用户命名空间内私有 daemon（缺 subuid/newuidmap、宿主 containerd 不可达而失败）；已用 `.dockerignore` 上下文模拟 + 内嵌 dist 二进制等价验证 | 在具备 Docker 的环境执行 `docker build -t xiaowork-nav:pond-test .` 并用独立容器 + 临时卷冒烟 |
+| **池塘主题人眼视觉终审 + 真机帧率** | 未验证：验收环境为 SwiftShader 软渲染，且当前模型无图像输入能力 | 维护者目视 `docs/screenshots/ascii-pond/final-*` 六张截图，并在真机复核帧率与观感 |
 | **生产服务器升级到 v2.1.2** | 生产当前为 v2.1.1；**由用户自行执行** | 按 [V2.1.2 发布文档 §9](deliveries/v2.1.2/release.md) 执行 `git pull --ff-only && ./scripts/update.sh v2.1.2` |
 | 独立测试服务器真实部署 + NPM 反代 HTTPS | 未验证 | 在具备 NPM 与域名的环境完成 |
 | GHCR 遗留标签 `2.0.0` / `2.0` 清理 | 可选 | 包管理页删除摘要 `cf6040d5…` 的版本（P5 报告 §9.3） |
