@@ -93,6 +93,13 @@ jobs:
           done
           curl -fsS http://127.0.0.1:18080/healthz
           curl -fsS http://127.0.0.1:18080/api/v1/version
+          # ASCII Pond is loaded on demand from the production image.
+          # Assert all vendored modules and the license are actually served.
+          for asset in pond.js koi.js util.js LICENSE; do
+            code=$(curl -fsS -o /dev/null -w '%{http_code}' "http://127.0.0.1:18080/vendor/ascii-pond/$asset")
+            test "$code" = "200" || { echo "vendor asset $asset returned $code"; exit 1; }
+          done
+          curl -fsS -o /dev/null -w '%{content_type}\n' http://127.0.0.1:18080/vendor/ascii-pond/pond.js | grep -q 'javascript'
           curl -fsS http://127.0.0.1:18080/ | grep -q '<div id="app">'
           docker rm -f xn-ci
 
