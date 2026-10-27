@@ -2,6 +2,29 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。所有重要变更记录于此。
 
+## [2.1.3] - 2026-10-28
+
+新增可选 ASCII Pond（锦鲤池塘）视觉主题。**仅前端改动；后端 API 和数据库结构未变（schema_version=3）。**
+
+### Added
+
+- 导航首页新增「锦鲤池塘」主题，与原有浅色和深色主题并存；浏览器本地选择持久化，旧偏好兼容。
+- 字符锦鲤背景按需加载，支持水面交互与点击投喂；切换离开时清理画布与事件监听。
+- 新增主题和动画生命周期单元测试（总计前端 53 个用例）。
+- Docker CI 增加 ASCII Pond 静态模块及 MIT 许可证的状态码和 JavaScript MIME 冒烟检查。
+
+### Fixed
+
+- 手机端新增主题切换器导致的顶部横向溢出。
+- 首帧主题背景闪烁。
+- 锦鲤主题站点无图标占位字母对比度不足。
+
+### Notes
+
+- 分类侧栏、滚动/标签两种布局、管理后台、业务数据与图标均维持现状；不涉及数据库迁移。
+- [PR #1](https://github.com/xiaowork-dev/xiaowork-nav/pull/1) 合并到 `main`；[Release v2.1.3](https://github.com/xiaowork-dev/xiaowork-nav/releases/tag/v2.1.3) 已发布多架构 Docker 镜像。
+- 更新现有站点：`./scripts/update.sh v2.1.3`。生产服务器更新仍需操作者执行。
+
 ## [2.1.2] - 2026-10-26
 
 滚动模式页面骨架重构（**纯前端**，无数据库结构变更，`schema_version` 仍为 `3`）。
